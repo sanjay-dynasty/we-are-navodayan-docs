@@ -343,3 +343,337 @@ Verified invalid routes display the 404 page correctly.
     git commit -m "feat(web): Phase 1 - Complete UI foundation and routing"
 
     git push origin main
+
+## Phase 2 — API & Application Foundation
+
+### W2.1 — Configure API Client
+
+Configured Axios as the centralized HTTP client for communication between the React application and backend APIs.
+
+    npm install axios
+
+Created:
+
+- `src/services/api/client/apiClient.ts`
+
+- `src/services/api/client/index.ts`
+
+- `src/services/api/index.ts`
+
+Configured:
+
+- Base API URL from environment configuration
+
+- Request timeout
+
+- JSON content type
+
+### W2.2 — Configure API Environments
+
+Configured environment-specific API settings for local, development, staging, and production environments.
+
+Created:
+
+- `.env.development`
+
+- `.env.staging`
+
+- `.env.production`
+
+Updated:
+
+- `src/config/env.ts`
+
+Configured:
+
+- `VITE_APP_NAME`
+
+- `VITE_API_BASE_URL`
+
+- `VITE_APP_ENV`
+
+Added environment variable validation to ensure required application configuration is available at runtime.
+
+Updated `.gitignore` to protect local environment files and prevent environment-specific local configuration from being committed.
+
+### W2.3 — Define API Types & Contracts
+
+Created reusable TypeScript interfaces for API responses, API errors, authentication, users, and JNV data.
+
+Created:
+
+- `src/types/api/apiResponse.ts`
+
+- `src/types/api/apiError.ts`
+
+- `src/types/auth/auth.ts`
+
+- `src/types/user/user.ts`
+
+- `src/types/jnv/jnv.ts`
+
+Created centralized barrel exports:
+
+- `src/types/api/index.ts`
+
+- `src/types/auth/index.ts`
+
+- `src/types/user/index.ts`
+
+- `src/types/jnv/index.ts`
+
+- `src/types/index.ts`
+
+Defined contracts for:
+
+- Login request and response
+
+- Refresh token request and response
+
+- User information
+
+- JNV information
+
+- Generic API response
+
+- API error response
+
+### W2.4 — Create API Service Structure
+
+Created a feature-oriented API service structure for authentication, users, and JNV operations.
+
+Created:
+
+- `src/services/api/auth/authService.ts`
+
+- `src/services/api/auth/index.ts`
+
+- `src/services/api/user/userService.ts`
+
+- `src/services/api/user/index.ts`
+
+- `src/services/api/jnv/jnvService.ts`
+
+- `src/services/api/jnv/index.ts`
+
+Configured API operations for:
+
+- User login
+
+- Refresh token
+
+- Logout
+
+- Get current user
+
+- Get user by ID
+
+- Get all JNVs
+
+- Get JNV by ID
+
+Created centralized API exports through:
+
+- `src/services/api/index.ts`
+
+The configured endpoint paths represent the frontend API contract and will be connected to the Spring Boot backend during backend integration.
+
+### W2.5 — Configure TanStack Query
+
+Configured TanStack Query for server-state management, API caching, request lifecycle handling, and asynchronous data management.
+
+    npm install @tanstack/react-query
+
+    npm install -D @tanstack/react-query-devtools
+
+Created:
+
+- `src/lib/query/queryClient.ts`
+
+- `src/lib/query/index.ts`
+
+Configured:
+
+- Query stale time
+
+- Query garbage collection time
+
+- Query retry behavior
+
+- Window focus refetch behavior
+
+- Mutation retry behavior
+
+Integrated `QueryClientProvider` into the application provider layer.
+
+Updated:
+
+- `src/app/providers.tsx`
+
+Enabled React Query Devtools for development-time API state inspection.
+
+### W2.6 — Configure Global Error Handling
+
+Created centralized API error normalization and HTTP status handling utilities.
+
+Created:
+
+- `src/utils/error/apiError.ts`
+
+- `src/utils/error/httpStatus.ts`
+
+- `src/utils/error/index.ts`
+
+Configured handling for common HTTP responses including:
+
+- 400 Bad Request
+
+- 401 Unauthorized
+
+- 403 Forbidden
+
+- 404 Not Found
+
+- 409 Conflict
+
+- 422 Unprocessable Entity
+
+- 429 Too Many Requests
+
+- 500 Internal Server Error
+
+- 502 Bad Gateway
+
+- 503 Service Unavailable
+
+- 504 Gateway Timeout
+
+Updated:
+
+- `src/services/api/client/apiClient.ts`
+
+Added an Axios response interceptor to normalize API errors into a consistent application-level error structure.
+
+### W2.7 — Configure Loading & Empty States
+
+Created reusable application-level components for loading, empty, and error states.
+
+Created:
+
+- `src/components/common/LoadingState/LoadingState.tsx`
+
+- `src/components/common/LoadingState/LoadingState.css`
+
+- `src/components/common/EmptyState/EmptyState.tsx`
+
+- `src/components/common/EmptyState/EmptyState.css`
+
+- `src/components/common/ErrorState/ErrorState.tsx`
+
+- `src/components/common/ErrorState/ErrorState.css`
+
+Updated:
+
+- `src/components/common/index.ts`
+
+Configured reusable states for:
+
+- Loading API data
+
+- Empty data collections
+
+- API or application errors
+
+- Optional action buttons
+
+### W2.8 — Create Common Hooks & Utilities
+
+Created reusable React hooks and utility functions required across the application.
+
+Created:
+
+- `src/hooks/useDebounce.ts`
+
+- `src/hooks/useMediaQuery.ts`
+
+- `src/hooks/index.ts`
+
+Implemented:
+
+- Debounced value handling
+
+- Responsive media-query detection using `useSyncExternalStore`
+
+Created formatting utilities:
+
+- `src/utils/format/formatDate.ts`
+
+- `src/utils/format/index.ts`
+
+Implemented reusable date formatting using `Intl.DateTimeFormat`.
+
+Created validation utilities:
+
+- `src/utils/validation/validation.ts`
+
+- `src/utils/validation/index.ts`
+
+Implemented validation helpers for:
+
+- Required values
+
+- Email format
+
+- Password length
+
+Updated:
+
+- `src/utils/index.ts`
+
+Configured centralized exports for error handling, formatting, and validation utilities.
+
+## Phase 2 Verification
+
+- ESLint: Passed
+
+- Prettier: Passed
+
+- TypeScript: Passed
+
+- Production build: Passed
+
+- Git diff check: Passed
+
+- Development server: Passed
+
+- API client: Verified
+
+- API environment configuration: Verified
+
+- API types and contracts: Verified
+
+- API service structure: Verified
+
+- TanStack Query: Verified
+
+- Global error handling: Verified
+
+- Loading state: Verified
+
+- Empty state: Verified
+
+- Error state: Verified
+
+- Common hooks: Verified
+
+- Formatting utilities: Verified
+
+- Validation utilities: Verified
+
+## Phase 2 Status
+
+**Completed**
+
+## Phase 2 Commit
+
+    git commit -m "feat(web): Phase 2 : API & Application Foundation"
