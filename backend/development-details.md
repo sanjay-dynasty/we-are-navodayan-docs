@@ -1018,3 +1018,675 @@ Established the complete initial microservices foundation:
 ## Phase 1 Architectural Decision
 
 Kafka has intentionally been deferred until the platform has a real asynchronous business workflow that requires event-driven communication.
+
+# Phase 2 — Database Foundation
+
+**Project:** We Are Navodayan  
+**Technology Stack:** Java 21, Spring Boot 4.1.1, Spring Data JPA, Hibernate, PostgreSQL 17, Flyway, HikariCP, Maven, JUnit 5  
+**Status:** Core foundation completed; entity, migration, transaction, pooling and integration-test implementation currently covers `user-service` and `jnv-service`.
+
+---
+
+## Phase 2 Overview
+
+Phase 2 establishes the database foundation for the We Are Navodayan microservices platform. It defines service-level database ownership, configures PostgreSQL, introduces JPA entities and repositories, manages database schema changes with Flyway, adds indexes, implements service-layer transaction management, configures connection pools, and verifies database functionality through automated tests.
+
+### Objectives
+
+- Establish independent database ownership for business microservices.
+- Configure PostgreSQL for local development.
+- Integrate Spring Data JPA and Hibernate.
+- Create domain entities and repositories.
+- Manage schema changes through Flyway migrations.
+- Add database indexes and uniqueness constraints.
+- Configure transactional service-layer operations.
+- Configure HikariCP connection pools.
+- Test persistence, constraints, and service behavior.
+- Verify the complete Maven multi-module project.
+
+### Phase Checklist
+
+| Task | Description | Status |
+|---|---|---|
+| B2.1 | Design Service Data Ownership | Completed |
+| B2.2 | Configure PostgreSQL | Completed |
+| B2.3 | Configure Spring Data JPA | Foundation configured; entity/repository implementation started |
+| B2.4 | Define Entities & Relationships | Implemented for User and JNV domains |
+| B2.5 | Configure Database Migrations | Flyway migrations implemented for User and JNV domains |
+| B2.6 | Configure Indexes | Implemented in the relevant migrations |
+| B2.7 | Configure Transactions | Implemented and tested in User and JNV services |
+| B2.8 | Configure Connection Pooling | HikariCP configured for User and JNV services |
+| B2.9 | Database Testing | Integration tests implemented; full Maven verification passed |
+
+---
+
+## B2.1 — Design Service Data Ownership
+
+**Status:** Completed
+
+### Objective
+
+Define which microservice owns each domain's data and prevent services from directly accessing databases owned by other services.
+
+### Database Ownership
+
+Each business microservice has its own logical PostgreSQL database.
+
+| Microservice | Database |
+|---|---|
+| `auth-service` | `auth_db` |
+| `user-service` | `user_db` |
+| `jnv-service` | `jnv_db` |
+| `alumni-service` | `alumni_db` |
+| `community-service` | `community_db` |
+| `opportunity-service` | `opportunity_db` |
+| `mentorship-service` | `mentorship_db` |
+| `event-service` | `event_db` |
+| `notification-service` | `notification_db` |
+| `api-gateway` | No business database |
+
+### Architecture Decisions
+
+- Each business microservice owns its domain data.
+- A service must not directly query another service's database.
+- Cross-service data access uses service APIs or a deliberately designed asynchronous workflow.
+- Database relationships are maintained within the owning service.
+- Cross-service foreign-key relationships are avoided.
+- PostgreSQL is the primary relational database.
+- Redis is reserved for appropriate future caching and other use cases.
+
+### Result
+
+The database ownership model establishes clear boundaries for persistence, migrations, transactions, and independent service evolution.
+
+---
+
+## B2.2 — Configure PostgreSQL
+
+**Status:** Completed
+
+### Objective
+
+Configure a local PostgreSQL environment and connect the Spring Boot services to their designated databases.
+
+### PostgreSQL Environment
+
+| Setting | Value |
+|---|---|
+| Docker container | `we-are-navodayan-postgres` |
+| Docker image | `postgres:17` |
+| Host port | `5432` |
+| Database user | `navodayan` |
+| Default database | `postgres` |
+| Password source | `DB_PASSWORD` environment variable |
+
+PostgreSQL runs locally using Docker. The database password is supplied through an environment variable instead of being embedded in application code.
+
+### Databases Created
+
+- `auth_db`
+- `user_db`
+- `jnv_db`
+- `alumni_db`
+- `community_db`
+- `opportunity_db`
+- `mentorship_db`
+- `event_db`
+- `notification_db`
+
+These databases establish the intended ownership model. A database existing does not mean its complete domain schema and business functionality have already been implemented.
+
+### Spring Boot Configuration
+
+Local PostgreSQL connection settings were configured in the service application properties.
+
+Example:
+
+```properties
+spring.config.activate.on-profile=local
+
+spring.datasource.url=jdbc:postgresql://localhost:5432/auth_db
+spring.datasource.username=navodayan
+spring.datasource.password=${DB_PASSWORD}
+
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.open-in-view=false
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.jdbc.time_zone=UTC
+```
+
+**Important:** The database name must match the database owned by the specific service. The example above is for `auth-service`; the User and JNV services use their own databases.
+
+### Configuration Decisions
+
+- Use environment variables for database credentials.
+- Keep local database settings in the local profile.
+- Use Hibernate schema validation rather than automatic schema creation or modification.
+- Disable Open EntityManager in View.
+- Avoid enabling SQL logging by default.
+- Use UTC for Hibernate JDBC timestamp handling.
+
+### Result
+
+PostgreSQL connectivity was established for the business services, and the database environment was available for migration execution and integration testing.
+
+---
+
+## B2.3 — Configure Spring Data JPA
+
+**Status:** Foundation configured; implementation started for User and JNV domains
+
+### Objective
+
+Integrate Spring Data JPA and Hibernate to provide object-relational mapping and repository-based database operations.
+
+### Technology Responsibilities
+
+- **Spring Data JPA:** Provides repository abstractions and CRUD operations.
+- **Hibernate:** Implements JPA object-relational mapping.
+- **PostgreSQL driver:** Connects the application to PostgreSQL.
+- **Flyway:** Manages version-controlled database schema changes.
+
+### Repository Pattern
+
+The intended persistence flow is:
+
+```text
+Service Layer
+     |
+     v
+Spring Data JPA Repository
+     |
+     v
+Hibernate / JPA
+     |
+     v
+PostgreSQL Database
+```
+
+### Implemented Repositories
+
+The following repositories were implemented for the current domain models:
+
+- `JnvRepository`
+- `UserProfileRepository`
+
+They provide standard persistence operations and domain-specific queries, including lookups by school code, authentication user ID, and JNV ID.
+
+### Schema Management
+
+Hibernate is configured to validate the entity mappings against the database schema. Flyway is responsible for applying schema migrations.
+
+This separates application persistence mappings from database schema evolution.
+
+### Result
+
+The persistence foundation is implemented and verified for the User and JNV domains. Complete domain entities and repositories for the remaining microservices are future work.
+
+---
+
+## B2.4 — Define Entities & Relationships
+
+**Status:** Completed for User and JNV domains
+
+### Objective
+
+Represent the core User and JNV domain data as JPA entities and map those entities to PostgreSQL tables.
+
+### 1. JNV Entity
+
+**Class:** `Jnv`
+
+**Service:** `jnv-service`
+
+**Database:** `jnv_db`
+
+The entity represents a Jawahar Navodaya Vidyalaya record.
+
+| Field | Purpose |
+|---|---|
+| `id` | Entity identifier |
+| `schoolCode` | School code with uniqueness enforcement |
+| `schoolName` | School name |
+| `state` | State |
+| `district` | District |
+| `address` | School address |
+| `pinCode` | Postal PIN code |
+| `active` | Indicates whether the JNV record is active |
+
+The entity is persisted through `JnvRepository`.
+
+### 2. User Profile Entity
+
+**Class:** `UserProfile`
+
+**Service:** `user-service`
+
+**Database:** `user_db`
+
+The entity represents a user's platform profile.
+
+| Field | Purpose |
+|---|---|
+| `id` | Entity identifier |
+| `authUserId` | Identifier associated with the authentication user; uniqueness is enforced |
+| `fullName` | User's full name |
+| `bio` | Profile biography |
+| `batchYear` | Navodaya batch year |
+| `jnvId` | Identifier of the associated JNV |
+| `profileImageUrl` | Profile image location or URL |
+
+The entity is persisted through `UserProfileRepository`.
+
+### Relationship Design
+
+The profile stores its JNV association as an identifier. The JNV and User Profile domains belong to different services and different databases.
+
+Consequently, the User Service must not establish a cross-database JPA relationship that directly queries the JNV database. Cross-service verification or retrieval must use the established service communication layer.
+
+The User Service already has a REST client foundation for communicating with the JNV Service.
+
+### Result
+
+The initial domain persistence models are in place for JNV records and user profiles. The remaining business domains will receive their own entities and relationships as their features are implemented.
+
+---
+
+## B2.5 — Configure Database Migrations
+
+**Status:** Completed for User and JNV domains
+
+### Objective
+
+Manage database schema changes in a repeatable, version-controlled manner.
+
+### Technology
+
+Flyway database migrations.
+
+### Implemented Approach
+
+- Store migration scripts with their owning service.
+- Use versioned migration files.
+- Let Flyway validate and apply migrations during application startup.
+- Keep entity mappings aligned with the migrated database schema.
+- Use Hibernate validation to detect schema mismatches.
+
+### Migration Verification
+
+During application startup, Flyway validates previously applied migrations and checks whether the database schema is up to date.
+
+The User Service startup logs confirmed that two migrations were validated and the schema was already at version 2, with no additional migration required during that run.
+
+The JNV and User services have migration-managed schemas for their implemented entities.
+
+### Why Flyway?
+
+- Schema changes are version-controlled.
+- Database initialization is repeatable.
+- Existing environments can be migrated incrementally.
+- Schema history is tracked in the database.
+- Hibernate is not responsible for silently modifying production schemas.
+
+### Result
+
+Flyway migration execution and schema validation were verified for the implemented User and JNV database schemas.
+
+---
+
+## B2.6 — Configure Indexes
+
+**Status:** Completed for the implemented User and JNV schemas
+
+### Objective
+
+Improve lookup performance and enforce important data-integrity rules through database indexes and uniqueness constraints.
+
+### Implemented Indexing Areas
+
+The migrations define indexes and uniqueness rules appropriate to the implemented domain models.
+
+Important lookup fields include:
+
+- JNV school code.
+- User authentication user ID.
+- User profile JNV association.
+
+### Uniqueness Rules
+
+| Domain | Field | Purpose |
+|---|---|---|
+| JNV | `schoolCode` | Prevent duplicate school codes |
+| User Profile | `authUserId` | Prevent multiple profiles from using the same authentication user ID |
+
+Database-level uniqueness is important because application-level checks alone cannot prevent concurrent requests from creating duplicate records.
+
+### Verification
+
+Integration tests attempted duplicate inserts for both domains and verified that the database rejected them.
+
+The expected database constraint violations in these negative tests do not indicate a failed test suite.
+
+### Result
+
+The implemented schemas include indexing and uniqueness protections for the principal lookup and identity fields. Indexing for future search and filtering features will be introduced as those access patterns are defined.
+
+---
+
+## B2.7 — Configure Transactions
+
+**Status:** Completed and tested for User and JNV services
+
+### Objective
+
+Establish service-layer transaction boundaries so that database operations execute with the intended transactional behavior.
+
+### Implemented Classes
+
+**JNV Service**
+
+`jnv-service/src/main/java/com/wearenavodayan/jnvservice/service/JnvService.java`
+
+**User Profile Service**
+
+`user-service/src/main/java/com/wearenavodayan/userservice/service/UserProfileService.java`
+
+### Transaction Strategy
+
+Both services use class-level read-only transaction configuration:
+
+```java
+@Service
+@Transactional(readOnly = true)
+public class ExampleService {
+    // Read operations
+}
+```
+
+Write operations explicitly override the read-only default:
+
+```java
+@Transactional
+public ExampleEntity create(ExampleEntity entity) {
+    return repository.save(entity);
+}
+```
+
+### Implemented Operations
+
+Both services implement the appropriate methods for:
+
+- Creating records.
+- Retrieving records by ID.
+- Retrieving records using domain-specific identifiers.
+- Listing records.
+- Updating existing records.
+- Deleting records.
+- Checking whether records exist.
+
+The JNV Service supports lookup by school code. The User Service supports lookup by authentication user ID and retrieval by JNV ID.
+
+Missing records are handled using `EntityNotFoundException`.
+
+### Transaction Tests
+
+Dedicated test classes were created:
+
+- `JnvServiceTransactionTests`
+- `UserProfileTransactionTests`
+
+The tests verify service behavior and inspect transaction metadata to confirm the intended read-only and write transaction configuration.
+
+The transaction test classes contain three tests each, and both suites passed.
+
+### Important Boundary
+
+Transaction management is currently implemented for the User and JNV services. The current tests verify transaction configuration and CRUD behavior; they do not constitute a complete rollback test for a multi-step business transaction.
+
+### Result
+
+Service-layer transaction boundaries are established for the two implemented domain services, ready for later controller and business workflow integration.
+
+---
+
+## B2.8 — Configure Connection Pooling
+
+**Status:** Completed for User and JNV services
+
+### Objective
+
+Configure database connection pooling to reuse database connections efficiently and limit the number of concurrent connections opened by each service.
+
+### Technology
+
+HikariCP, the JDBC connection pool used by the Spring Boot datasource configuration.
+
+### Configuration
+
+The following settings were added to the local profiles.
+
+For `jnv-service`:
+
+```properties
+spring.datasource.hikari.pool-name=JnvServiceHikariPool
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=1
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+```
+
+For `user-service`, the same pool sizing and timeout values are used, with the pool name:
+
+```properties
+spring.datasource.hikari.pool-name=UserServiceHikariPool
+```
+
+### Configuration Explanation
+
+| Property | Value | Purpose |
+|---|---:|---|
+| `pool-name` | Service-specific | Makes connection pool logs identifiable |
+| `maximum-pool-size` | `5` | Limits the pool to five connections |
+| `minimum-idle` | `1` | Targets at least one idle connection |
+| `connection-timeout` | `30000` ms | Maximum wait for a connection |
+| `idle-timeout` | `600000` ms | Idle connection timeout |
+| `max-lifetime` | `1800000` ms | Maximum connection lifetime |
+
+These are local development settings, not final production capacity decisions. Production values should be sized against expected traffic, database connection limits, service replica counts, and workload characteristics.
+
+### Verification
+
+The services started successfully and established PostgreSQL connections. The full Maven verification also passed after these changes.
+
+### Result
+
+Explicit HikariCP pool configuration is in place for the User and JNV services. Other services may still use their default pool configuration until their database workloads are implemented and tuned.
+
+---
+
+## B2.9 — Database Testing
+
+**Status:** Completed for the current database foundation
+
+### Objective
+
+Verify database connectivity, schema validation, migrations, entity persistence, repository queries, uniqueness constraints, and service-layer behavior through automated tests.
+
+### Test Infrastructure
+
+- JUnit 5.
+- Spring Boot test support.
+- Spring application context tests.
+- Spring Data JPA repositories.
+- PostgreSQL local development database.
+- Flyway migration validation.
+- Maven multi-module build verification.
+
+### User Service Integration Tests
+
+**Test class:** `UserServiceApplicationTests`
+
+The expanded suite covers:
+
+1. Application context loading.
+2. Saving and retrieving a user profile.
+3. Finding a profile by authentication user ID.
+4. Checking whether a profile exists for an authentication user ID.
+5. Retrieving profiles by JNV ID.
+6. Rejecting duplicate authentication user IDs.
+
+### JNV Service Integration Tests
+
+**Test class:** `JnvServiceApplicationTests`
+
+The expanded suite covers:
+
+1. Application context loading.
+2. Saving and retrieving a JNV record.
+3. Finding a JNV by school code.
+4. Checking whether a school code exists.
+5. Rejecting duplicate school codes.
+
+### Service Transaction Tests
+
+| Test Class | Tests |
+|---|---:|
+| `JnvServiceTransactionTests` | 3 |
+| `UserProfileTransactionTests` | 3 |
+
+These tests cover CRUD service behavior, missing-record handling, and transaction metadata.
+
+### Test Cleanup
+
+The integration tests clean up records created during testing to reduce interference between test executions.
+
+### Timezone Configuration
+
+The full verification run used the following PowerShell session settings:
+
+```powershell
+$env:DB_PASSWORD="navodayan_local"
+$env:JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
+```
+
+The timezone setting was applied to the current shell session for consistent test execution; it was not intended as a permanent operating-system setting.
+
+### Targeted Transaction Test Command
+
+```powershell
+mvn -pl jnv-service,user-service "-Dtest=JnvServiceTransactionTests,UserProfileTransactionTests" test
+```
+
+**Result:** Both services passed their targeted transaction test suites.
+
+### Full Build Verification
+
+Command executed:
+
+```powershell
+mvn clean verify
+```
+
+The command completed with `BUILD SUCCESS`, and all 11 Maven reactor modules reported success.
+
+### Result
+
+The database foundation passed targeted transaction testing and the full multi-module Maven verification.
+
+---
+
+## Phase 2 — Final Architecture
+
+```text
+We Are Navodayan
+       |
+       v
+Spring Boot Microservices
+       |
+       +------------------------+
+       |                        |
+       v                        v
+  User Service             JNV Service
+       |                        |
+       v                        v
+ UserProfileService        JnvService
+       |                        |
+       v                        v
+ UserProfileRepository     JnvRepository
+       |                        |
+       v                        v
+ Hibernate / JPA           Hibernate / JPA
+       |                        |
+       v                        v
+ HikariCP Pool              HikariCP Pool
+       |                        |
+       v                        v
+ PostgreSQL                 PostgreSQL
+    user_db                    jnv_db
+       |                        |
+       v                        v
+ Flyway Migrations          Flyway Migrations
+```
+
+Each service accesses its own database. Cross-service communication remains API-based rather than direct database access.
+
+---
+
+## Phase 2 — Final Checklist
+
+| Item | Status |
+|---|---|
+| Database ownership boundaries defined | Completed |
+| PostgreSQL configured through Docker | Completed |
+| Separate logical databases created | Completed |
+| Database credentials externalized | Completed |
+| JPA/Hibernate persistence foundation | Completed |
+| JNV entity and repository | Implemented |
+| User Profile entity and repository | Implemented |
+| Flyway migrations for JNV and User | Implemented |
+| Hibernate schema validation | Configured |
+| Database indexes and uniqueness rules | Implemented for current schemas |
+| Service-layer transaction management | Implemented for JNV and User |
+| Transaction behavior tests | Passed |
+| HikariCP explicit configuration | Implemented for JNV and User |
+| JNV database integration tests | Passed |
+| User database integration tests | Passed |
+| Full Maven verification | Passed |
+| All business schemas and entities implemented | Not yet complete |
+
+---
+
+## Git History
+
+The following commits are recorded in the backend repository:
+
+| Commit | Description |
+|---|---|
+| `5989511` | Phase 2.1–2.2: Design and Configure PostgreSQL |
+| `d4c6422` | Phase 2.2: Stabilize PostgreSQL Test Configuration |
+| `ef2bae8` | Phase 2.4–2.6: Add JPA Entities, Flyway Migrations and Indexes |
+| `b5a049a` | Phase 2.7: Add Service-Layer Transaction Management |
+| `b66057d` | Phase 2.8–2.9: Configure HikariCP and Add Database Integration Tests |
+
+The current backend repository was confirmed clean and synchronized with `origin/main` after these commits.
+
+---
+
+## Outstanding Work After Phase 2
+
+The database foundation is complete for the currently implemented User and JNV domains, but the following work remains for the overall platform:
+
+- Complete entity and repository implementations for the remaining business domains.
+- Add domain-specific migrations, constraints, and indexes as those schemas are introduced.
+- Add persistence and integration tests for each newly implemented service.
+- Add REST controllers and DTOs so database-backed functionality is exposed through APIs.
+- Introduce production-specific connection pool sizing and managed database credentials during deployment preparation.
+- Add explicit rollback tests when multi-operation transactional business workflows are implemented.
+
+## Phase 2 Conclusion
+
+Phase 2 established the PostgreSQL and JPA foundation, Flyway migration strategy, database constraints, service-layer transaction configuration, connection pooling, and automated persistence tests. The User and JNV services are the first implemented database-backed domains, and the complete Maven multi-module verification passed.
+
+**Next planned milestone:** Phase 3 — API Gateway & Service Discovery, beginning with an inspection of the existing gateway configuration before implementing any missing functionality.
