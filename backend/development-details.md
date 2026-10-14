@@ -2269,3 +2269,469 @@ Phase 3 established the gateway foundation for the We Are Navodayan microservice
 The targeted API Gateway test suite passed with 19 tests and no failures, errors, or skipped tests. Additional end-to-end testing remains necessary for production confidence.
 
 **Next planned milestone:** Phase 4 — Authentication & Authorization, beginning with authentication-flow design, followed by user registration, password hashing, login, JWT generation and validation, refresh-token rotation, Spring Security integration, role-based authorization, and authentication error handling.
+
+# Phase 4: Authentication & Security
+
+## Objective
+
+Implement a secure, production-oriented authentication and authorization system for the We Are Navodayan platform using Java 21, Spring Boot, Spring Security, JWT, PostgreSQL, Flyway, and BCrypt.
+
+This phase establishes the foundation for secure access across the platform's microservices.
+
+## Technology Stack
+
+- Java 21
+- Spring Boot 4.1.1
+- Spring Security 7
+- Spring OAuth2 Resource Server
+- JWT (JSON Web Token)
+- PostgreSQL 17
+- Spring Data JPA
+- Flyway
+- BCrypt password hashing
+- Maven
+- JUnit 5
+- Spring Boot Test
+- MockMvc
+
+---
+
+## Phase 4.1: Design Authentication Flow
+
+### Goals
+
+- Define registration and login flows.
+- Separate authentication credentials from user profile information.
+- Define access-token and refresh-token responsibilities.
+- Establish public and protected API endpoints.
+
+### Authentication Flow
+
+1. A user registers using their email, password, and full name.
+2. The auth service validates the request.
+3. The password is hashed using BCrypt.
+4. The account is saved in PostgreSQL.
+5. The user logs in with their credentials.
+6. The service validates the credentials.
+7. The service issues a short-lived JWT access token and a refresh token.
+8. The client sends the access token in the Authorization header.
+9. Spring Security validates the JWT before allowing access to protected endpoints.
+10. When the access token expires, the client uses the refresh token to obtain new tokens.
+
+### API Endpoints
+
+| Method | Endpoint | Access |
+|---|---|---|
+| POST | `/api/v1/auth/register` | Public |
+| POST | `/api/v1/auth/login` | Public |
+| POST | `/api/v1/auth/refresh` | Public |
+| GET | `/api/v1/auth/me` | Authenticated |
+| GET | `/api/v1/admin/access` | ADMIN role |
+| GET | `/actuator/health` | Public |
+| GET | `/actuator/info` | Public |
+
+---
+
+## Phase 4.2: User Registration
+
+### Goals
+
+- Implement registration API.
+- Validate incoming registration data.
+- Prevent duplicate email registrations.
+- Hash passwords before storing them.
+- Persist accounts in PostgreSQL.
+
+### Database Table: `user_accounts`
+
+| Column | Description |
+|---|---|
+| `id` | UUID primary key |
+| `email` | Unique email address |
+| `password_hash` | BCrypt password hash |
+| `full_name` | User's full name |
+| `role` | Account role; defaults to `USER` |
+| `enabled` | Whether the account is enabled |
+| `created_at` | Account creation timestamp |
+| `updated_at` | Last update timestamp |
+
+### Implementation Details
+
+- Normalize email addresses by trimming whitespace and converting to lowercase.
+- Reject duplicate email addresses.
+- Validate required fields and email format.
+- Store only the password hash, never the plaintext password.
+- Use Flyway to manage schema migrations.
+- Use service-layer transaction management.
+
+### Expected Behavior
+
+- Successful registration creates an account.
+- Duplicate email returns HTTP `409 Conflict`.
+- Invalid request data returns HTTP `400 Bad Request`.
+- Passwords are stored as BCrypt hashes.
+
+---
+
+## Phase 4.3: Login and JWT Generation
+
+### Goals
+
+- Authenticate registered users.
+- Generate signed JWT access tokens.
+- Return access and refresh tokens after successful login.
+
+### JWT Claims
+
+| Claim | Purpose |
+|---|---|
+| `iss` | Token issuer |
+| `sub` | User UUID |
+| `aud` | Intended API audience |
+| `iat` | Token issue time |
+| `exp` | Token expiry time |
+| `jti` | Unique token identifier |
+| `role` | User role, such as `USER` or `ADMIN` |
+
+### JWT Configuration
+
+- Issuer: `we-are-navodayan-auth`
+- Audience: `we-are-navodayan-api`
+- Access-token lifetime: 15 minutes
+- Refresh-token lifetime: 7 days
+- Signing algorithm: HS256
+
+### Security Requirements
+
+- Keep the JWT signing secret outside source control.
+- Read the secret from the `JWT_SECRET` environment variable.
+- Use a Base64-encoded secret containing at least 32 bytes.
+- Never log passwords, access tokens, refresh tokens, or signing secrets.
+
+### Expected Behavior
+
+- Valid credentials return access and refresh tokens.
+- Invalid credentials return HTTP `401 Unauthorized`.
+- The response does not expose the stored password hash.
+
+---
+
+## Phase 4.4: Password Hashing and Endpoint Protection
+
+### Goals
+
+- Secure password storage.
+- Protect private endpoints.
+- Validate JWTs on protected requests.
+
+### Password Security
+
+- Use Spring Security's BCrypt password encoder.
+- Hash passwords during registration.
+- Verify passwords during login using the password encoder.
+- Never store or compare plaintext passwords directly.
+
+### Endpoint Protection
+
+- Public endpoints: registration, login, refresh, health, and info.
+- Protected endpoints: require a valid JWT.
+- Admin endpoints: require the `ADMIN` role.
+- Use stateless session management.
+- Disable CSRF for the stateless bearer-token API.
+
+### Expected Behavior
+
+- Missing token on a protected endpoint returns HTTP `401`.
+- Invalid or expired token returns HTTP `401`.
+- Valid token allows access when authorization rules permit it.
+
+---
+
+## Phase 4.5: JWT Generation
+
+### Goals
+
+- Generate signed JWT access tokens using Spring Security's JWT support.
+- Populate required claims.
+- Set issue and expiration timestamps.
+- Include the authenticated user's UUID and role.
+
+### Implementation
+
+- Configure a `JwtEncoder`.
+- Use the configured HS256 signing key.
+- Generate a unique `jti` for every access token.
+- Set the issuer and audience consistently with JWT validation.
+- Set the expiration to 15 minutes after issuance.
+
+### Expected Behavior
+
+A successfully authenticated user receives a signed JWT containing the expected claims and a limited lifetime.
+
+---
+
+## Phase 4.6: JWT Validation
+
+### Goals
+
+- Validate incoming access tokens.
+- Verify the signature, issuer, audience, and expiration.
+- Reject malformed or expired tokens.
+- Make the authenticated user's identity available to controllers.
+
+### Implementation
+
+- Configure a `JwtDecoder`.
+- Validate the issuer.
+- Validate the audience.
+- Verify the signature using the configured signing key.
+- Enforce token expiration.
+- Integrate JWT validation with Spring Security's OAuth2 Resource Server.
+
+### Expected Behavior
+
+- Valid JWT: request proceeds to authorization.
+- Invalid JWT: HTTP `401 Unauthorized`.
+- Expired JWT: HTTP `401 Unauthorized`.
+- Incorrect issuer or audience: HTTP `401 Unauthorized`.
+
+---
+
+## Phase 4.7: Refresh Token Rotation
+
+### Goals
+
+- Allow users to obtain new tokens without logging in again.
+- Store refresh-token hashes instead of raw tokens.
+- Rotate refresh tokens after successful use.
+- Prevent reuse of revoked refresh tokens.
+
+### Database Table: `refresh_tokens`
+
+| Column | Description |
+|---|---|
+| `id` | UUID primary key |
+| `user_id` | Foreign key to `user_accounts.id` |
+| `token_hash` | SHA-256 hash of the refresh token |
+| `expires_at` | Refresh-token expiration time |
+| `revoked` | Whether the token has been revoked |
+| `created_at` | Token creation timestamp |
+
+### Refresh Token Flow
+
+1. Generate a cryptographically secure random refresh token.
+2. Return the raw token to the client only when issuing it.
+3. Store its SHA-256 hash in PostgreSQL.
+4. When refreshing, hash the supplied token and locate the stored record.
+5. Validate that the token exists, has not expired, and has not been revoked.
+6. Revoke the existing refresh token.
+7. Issue a new access token and a new refresh token.
+8. Store the hash of the new refresh token.
+
+### Security Requirements
+
+- Use cryptographically secure random token generation.
+- Never store raw refresh tokens in the database.
+- Reject expired, unknown, or revoked tokens.
+- Ensure token rotation is transactionally safe.
+- Consider concurrent refresh requests and replay detection.
+- Use appropriate client-side storage and transport protections.
+
+### Expected Behavior
+
+- Valid refresh token returns a new token pair.
+- Invalid refresh token returns HTTP `401`.
+- Reusing a revoked token is rejected.
+- Old refresh tokens cannot be used after successful rotation.
+
+---
+
+## Phase 4.8: Spring Security Integration
+
+### Goals
+
+- Integrate JWT validation with Spring Security.
+- Configure the security filter chain.
+- Enforce stateless authentication.
+- Test public and protected endpoints.
+
+### Implementation
+
+- Define a `SecurityFilterChain`.
+- Disable CSRF for the bearer-token API.
+- Configure `SessionCreationPolicy.STATELESS`.
+- Permit the required public endpoints.
+- Require authentication for all other endpoints by default.
+- Integrate the JWT resource server.
+
+### Expected Behavior
+
+- Public endpoints remain accessible without a token.
+- Protected endpoints require a valid JWT.
+- JWT validation failures are handled by Spring Security.
+- No server-side HTTP session is required for authentication.
+
+---
+
+## Phase 4.9: Role-Based Authorization
+
+### Goals
+
+- Enforce authorization based on JWT roles.
+- Distinguish ordinary users from administrators.
+- Prevent users from accessing administrator-only APIs.
+
+### Roles
+
+- `USER`
+- `ADMIN`
+
+### Implementation
+
+- Include the user's role in the JWT's `role` claim.
+- Configure `JwtGrantedAuthoritiesConverter` to read the `role` claim.
+- Apply the `ROLE_` authority prefix.
+- Restrict `/api/v1/admin/**` to users with the `ADMIN` role.
+- Require authentication for other protected endpoints.
+
+### Admin Test Endpoint
+
+`GET /api/v1/admin/access`
+
+Successful response:
+
+    {
+      "message": "Admin access granted"
+    }
+
+### Expected Behavior
+
+| Scenario | Expected status |
+|---|---|
+| No token | `401 Unauthorized` |
+| Invalid token | `401 Unauthorized` |
+| Valid USER token | `403 Forbidden` |
+| Valid ADMIN token | `200 OK` |
+
+### Authorization Security
+
+- Never trust a role supplied by a request parameter or request body.
+- Derive authorities from a validated JWT.
+- Restrict administrator-role assignment to trusted server-side workflows.
+- Protect administrative APIs with explicit authorization rules.
+
+---
+
+## Phase 4.10: Authentication Error Handling
+
+### Goals
+
+- Standardize security-related error responses.
+- Return consistent JSON for authentication and authorization failures.
+- Preserve existing registration, login, and refresh-token error handling.
+
+### Standard Error Response
+
+The `ApiErrorResponse` record contains:
+
+| Field | Description |
+|---|---|
+| `success` | Always `false` for errors |
+| `code` | Machine-readable error code |
+| `message` | Human-readable message |
+| `timestamp` | Error timestamp |
+| `path` | Request URI |
+
+### Error Codes
+
+| HTTP status | Error code | Meaning |
+|---|---|---|
+| `400` | Existing validation error code | Invalid request data |
+| `401` | `UNAUTHORIZED` | Missing or invalid access token |
+| `401` | `INVALID_CREDENTIALS` | Invalid login credentials |
+| `401` | `INVALID_REFRESH_TOKEN` | Invalid refresh token |
+| `403` | `FORBIDDEN` | Authenticated user lacks permission |
+| `409` | Existing duplicate-email error code | Email already registered |
+
+### Implementation
+
+- Create `SecurityErrorResponseWriter`.
+- Serialize error responses as JSON.
+- Configure Spring Security's `AuthenticationEntryPoint`.
+- Configure Spring Security's `AccessDeniedHandler`.
+- Explicitly configure the OAuth2 Resource Server authentication entry point so malformed or invalid bearer tokens receive the standard JSON response.
+- Keep existing login and refresh-token exception handlers intact.
+- Use the existing `ApiErrorResponse` record.
+
+### Expected Behavior
+
+- Missing access token returns a standard JSON `401`.
+- Invalid access token returns a standard JSON `401`.
+- Insufficient role returns a standard JSON `403`.
+- Invalid login and refresh-token responses preserve their existing error contracts.
+- Validation and duplicate-email errors continue using the existing application exception handler.
+
+---
+
+## Testing Strategy
+
+### Integration Tests
+
+The authentication service integration tests cover:
+
+- Successful user registration.
+- Duplicate-email rejection.
+- Registration validation.
+- Successful login.
+- Invalid login credentials.
+- JWT claims and expiration.
+- Access-token validation.
+- Missing-token behavior.
+- Invalid-token behavior.
+- Refresh-token rotation.
+- Invalid and reused refresh tokens.
+- Protected endpoint access.
+- User and administrator authorization.
+- Standard security error responses.
+- Application context startup.
+
+### Test Execution
+
+Run from the backend repository:
+
+    $env:DB_PASSWORD = "navodayan_local"
+    $env:JAVA_TOOL_OPTIONS = "-Duser.timezone=UTC"
+    mvn -pl auth-service clean test
+
+---
+
+## Phase 4 Completion Criteria
+
+- All authentication integration tests pass.
+- All authorization integration tests pass.
+- JWT signature, issuer, audience, and expiration are validated.
+- Passwords are stored using BCrypt.
+- Refresh tokens are stored as hashes and rotated after use.
+- Public and protected endpoints behave correctly.
+- User and administrator access restrictions are enforced.
+- Authentication and authorization errors follow the expected response format.
+- Changes are reviewed, committed, and pushed to `origin/main`.
+
+---
+
+## Git Commit History
+
+| Phase | Commit message |
+|---|---|
+| 4.1–4.2 | `Phase 4.1-4.2 : Design Authentication Flow & User Registration` |
+| 4.3 | `Phase 4.3 : Implement JWT Authentication and Login` |
+| 4.4 | `Phase 4.4 : Protect Endpoints and Validate JWT` |
+| 4.7 | `Phase 4.7 : Implement Refresh Token Rotation` |
+| 4.8 | `Phase 4.8 : Verify Spring Security Integration` |
+| 4.9–4.10 | `Phase 4.9-4.10 : Add Authorization and Security Error Handling` |
+
+---
+
+## Final Outcome
+
+Phase 4 establishes the authentication and authorization foundation for We Are Navodayan. The auth service supports account registration, login, JWT-based access, refresh-token rotation, protected APIs, role-based access control, and standardized security error responses.
