@@ -1690,3 +1690,582 @@ The database foundation is complete for the currently implemented User and JNV d
 Phase 2 established the PostgreSQL and JPA foundation, Flyway migration strategy, database constraints, service-layer transaction configuration, connection pooling, and automated persistence tests. The User and JNV services are the first implemented database-backed domains, and the complete Maven multi-module verification passed.
 
 **Next planned milestone:** Phase 3 — API Gateway & Service Discovery, beginning with an inspection of the existing gateway configuration before implementing any missing functionality.
+
+# Phase 3 — API Gateway & Service Discovery
+
+**Project:** We Are Navodayan
+
+**Technology Stack:** Java 21, Spring Boot 4.1.1, Spring Cloud Gateway Server WebMVC, Spring Boot Actuator, Spring MVC, Maven, JUnit 5, Mockito
+
+**Status:** Phase 3.1–3.8 implementation completed; targeted API Gateway tests passed. Advanced integration testing of downstream failures, timeouts, and exception handling remains outstanding.
+
+---
+
+## Phase 3 Overview
+
+Phase 3 establishes the API Gateway as the central entry point for the We Are Navodayan microservices platform. It configures request routing, request filtering, cross-origin resource sharing (CORS), rate limiting, downstream service communication settings, API versioning, correlation IDs, and standardized gateway error responses.
+
+The gateway runs on port `8080` and routes requests to the appropriate backend microservices.
+
+### Objectives
+
+- Configure the API Gateway.
+- Route requests to the appropriate microservices.
+- Add request filtering and correlation IDs.
+- Configure CORS for frontend integration.
+- Implement request rate limiting.
+- Configure downstream service URLs and HTTP client timeouts.
+- Introduce centralized API versioning.
+- Standardize gateway error responses.
+- Verify gateway configuration and behavior through automated tests.
+
+### Phase Checklist
+
+| Task | Description | Status |
+|---|---|---|
+| 3.1 | Configure API Gateway | Completed |
+| 3.2 | Configure Routing | Completed |
+| 3.3 | Configure Request Filtering | Completed |
+| 3.4 | Configure CORS | Completed |
+| 3.5 | Configure Rate Limiting | Completed |
+| 3.6 | Configure Service Communication | Configuration completed; actual timeout behavior needs integration testing |
+| 3.7 | Configure API Versioning | Completed |
+| 3.8 | Gateway Error Handling | Implementation completed; additional integration testing remains |
+
+---
+
+## 3.1 — Configure API Gateway
+
+**Status:** Completed
+
+### Objective
+
+Establish a centralized entry point through which frontend applications access backend microservices.
+
+### Technology
+
+- Spring Boot 4.1.1
+- Spring Cloud Gateway Server WebMVC
+- Spring Boot Actuator
+- Spring MVC
+
+### Configuration
+
+**File:** `api-gateway/src/main/resources/application.properties`
+
+The gateway is configured with the following properties:
+
+```properties
+spring.application.name=api-gateway
+spring.profiles.default=local
+server.port=8080
+
+management.endpoints.web.exposure.include=health,info,gateway
+management.endpoint.health.show-details=never
+management.endpoint.gateway.access=read-only
+
+management.endpoint.health.probes.enabled=true
+management.health.livenessstate.enabled=true
+management.health.readinessstate.enabled=true
+
+management.info.env.enabled=true
+info.app.name=We Are Navodayan API Gateway
+info.app.description=Central entry point for We Are Navodayan microservices
+info.app.version=0.0.1-SNAPSHOT
+```
+
+### Health Monitoring
+
+Spring Boot Actuator provides health and application information endpoints.
+
+- Health endpoint: `/actuator/health`
+- Application information: `/actuator/info`
+- Gateway actuator endpoint: `/actuator/gateway`
+
+Only the configured actuator endpoints are exposed through the web management interface.
+
+### Result
+
+The API Gateway configuration establishes the centralized entry point and provides basic health monitoring and application metadata.
+
+---
+
+## 3.2 — Configure Routing
+
+**Status:** Completed
+
+### Objective
+
+Forward incoming API requests to the appropriate downstream microservice based on their URL paths.
+
+### Downstream Service Configuration
+
+The gateway uses configurable base URLs for its services:
+
+```properties
+services.auth.base-url=http://localhost:8081
+services.user.base-url=http://localhost:8082
+services.jnv.base-url=http://localhost:8083
+```
+
+### Configured Routes
+
+| Route ID | Request Path | Destination |
+|---|---|---|
+| `auth-service-route` | `/api/v1/auth/**` | Auth Service, port 8081 |
+| `user-service-route` | `/api/v1/users/**` | User Service, port 8082 |
+| `jnv-service-route` | `/api/v1/jnvs/**` | JNV Service, port 8083 |
+
+### Route Configuration
+
+```properties
+spring.cloud.gateway.server.webmvc.routes[0].id=auth-service-route
+spring.cloud.gateway.server.webmvc.routes[0].uri=${services.auth.base-url}
+spring.cloud.gateway.server.webmvc.routes[0].predicates[0]=Path=${api.version.base-path}/auth/**
+
+spring.cloud.gateway.server.webmvc.routes[1].id=user-service-route
+spring.cloud.gateway.server.webmvc.routes[1].uri=${services.user.base-url}
+spring.cloud.gateway.server.webmvc.routes[1].predicates[0]=Path=${api.version.base-path}/users/**
+
+spring.cloud.gateway.server.webmvc.routes[2].id=jnv-service-route
+spring.cloud.gateway.server.webmvc.routes[2].uri=${services.jnv.base-url}
+spring.cloud.gateway.server.webmvc.routes[2].predicates[0]=Path=${api.version.base-path}/jnvs/**
+```
+
+### Routing Behavior
+
+For example, a request to:
+
+`http://localhost:8080/api/v1/users/123`
+
+matches the User Service route and is forwarded to the configured User Service destination.
+
+The gateway configuration does not itself implement the business functionality of the downstream service.
+
+### Result
+
+Three service routes are configured for authentication, user profiles, and JNV directory operations.
+
+---
+
+## 3.3 — Configure Request Filtering
+
+**Status:** Completed
+
+### Objective
+
+Attach a correlation identifier to incoming requests so that a request can be traced across gateway and downstream service logs.
+
+### Implementation
+
+**File:** `api-gateway/src/main/java/com/wearenavodayan/apigateway/filter/CorrelationIdFilter.java`
+
+The filter extends `OncePerRequestFilter` and manages the `X-Correlation-ID` header.
+
+### Implemented Behavior
+
+1. Reads an incoming `X-Correlation-ID` header.
+2. Preserves the supplied ID if it matches the permitted format.
+3. Generates a UUID if the header is missing.
+4. Replaces invalid correlation IDs with a generated UUID.
+5. Adds the correlation ID to the response.
+6. Wraps the incoming request so the ID can be accessed by downstream processing.
+
+### Validation Rule
+
+The accepted correlation ID format is:
+
+```text
+[A-Za-z0-9._-]{1,64}
+```
+
+This allows alphanumeric characters, periods, underscores, and hyphens, with a maximum length of 64 characters.
+
+### Tests
+
+Tests cover:
+
+- Preserving a valid incoming correlation ID.
+- Generating an ID when the header is missing.
+- Replacing an invalid incoming ID.
+- Integration with a temporary HTTP server for request processing.
+
+### Result
+
+Correlation IDs provide a consistent identifier for request tracing and troubleshooting.
+
+---
+
+## 3.4 — Configure CORS
+
+**Status:** Completed
+
+### Objective
+
+Allow the local web frontend to communicate with the API Gateway while restricting cross-origin requests to explicitly configured origins, methods, and headers.
+
+### Implementation
+
+**File:** `api-gateway/src/main/java/com/wearenavodayan/apigateway/config/CorsConfig.java`
+
+The configuration implements Spring MVC's `WebMvcConfigurer`.
+
+### CORS Configuration
+
+| Setting | Configured Value |
+|---|---|
+| Allowed origin | `http://localhost:5173` |
+| Allowed methods | GET, POST, PUT, PATCH, DELETE, OPTIONS |
+| Allowed headers | Authorization, Content-Type, X-Correlation-ID |
+| Exposed response header | X-Correlation-ID |
+| Credentials | Disabled |
+| Max age | 3600 seconds |
+
+### Explanation
+
+- The configured origin corresponds to the local frontend development server.
+- `Authorization` allows clients to send bearer tokens.
+- `Content-Type` supports JSON requests.
+- `X-Correlation-ID` supports request tracing.
+- Exposing `X-Correlation-ID` allows browser clients to read the response header.
+- Credentials are disabled in this configuration.
+
+### Tests
+
+`CorsConfigurationTests` inspect the configured CORS mappings, including the allowed origin, methods, headers, exposed headers, credentials, and maximum age.
+
+### Result
+
+The gateway has an explicit local-development CORS policy. Production frontend origins must be configured appropriately before deployment.
+
+---
+
+## 3.5 — Configure Rate Limiting
+
+**Status:** Completed for the in-memory implementation
+
+### Objective
+
+Limit the number of requests accepted from a client during a defined time window to help protect the API Gateway from excessive traffic.
+
+### Implementation
+
+**File:** `api-gateway/src/main/java/com/wearenavodayan/apigateway/filter/RateLimitFilter.java`
+
+The filter uses a concurrent in-memory map keyed by the client's remote IP address.
+
+### Configuration
+
+```properties
+gateway.rate-limit.capacity=100
+gateway.rate-limit.window-seconds=60
+```
+
+### Rate-Limiting Rules
+
+- Maximum configured capacity: 100 requests per client per window.
+- Window duration: 60 seconds.
+- Rate limiting applies to `/api/` requests.
+- OPTIONS requests are excluded.
+- Requests exceeding the configured limit receive HTTP `429 Too Many Requests`.
+- A cleanup mechanism periodically removes expired rate-limit entries.
+
+### Response Headers
+
+| Header | Purpose |
+|---|---|
+| `X-RateLimit-Limit` | Configured request limit |
+| `X-RateLimit-Remaining` | Remaining requests in the current window |
+| `Retry-After` | Indicates how long the client should wait after being limited |
+
+### Important Production Limitation
+
+The implementation uses an in-memory store. Each gateway instance maintains its own counters, so limits are not shared across multiple replicas.
+
+For production deployments with multiple gateway instances, a distributed rate-limiting mechanism, such as Redis-backed counters, should be considered.
+
+The current implementation is a fixed-window rate limiter, not a distributed token-bucket implementation.
+
+### Result
+
+An initial per-client-IP rate limiter is implemented, including response metadata and handling for requests that exceed the configured limit.
+
+---
+
+## 3.6 — Configure Service Communication
+
+**Status:** Configuration completed; actual timeout behavior requires further integration testing
+
+### Objective
+
+Centralize downstream service addresses and configure connection and response-read timeout settings for HTTP communication.
+
+### Service URLs
+
+```properties
+services.auth.base-url=http://localhost:8081
+services.user.base-url=http://localhost:8082
+services.jnv.base-url=http://localhost:8083
+```
+
+### HTTP Client Settings
+
+```properties
+spring.http.client.connect-timeout=3s
+spring.http.client.read-timeout=10s
+```
+
+### Explanation
+
+- **Connection timeout:** Configured to 3 seconds for establishing an HTTP connection.
+- **Read timeout:** Configured to 10 seconds for reading a response.
+- **Centralized service URLs:** Make downstream destinations configurable rather than embedding them in application code.
+
+The gateway uses Spring Cloud Gateway Server WebMVC, which is based on Spring MVC rather than the reactive WebFlux gateway.
+
+### Verification Boundary
+
+Automated tests verified the service URL and timeout property configuration. These tests did not prove that a real downstream connection failure or slow response is terminated at the exact configured duration.
+
+Additional integration tests are required to verify actual timeout behavior.
+
+### Result
+
+Downstream service addresses and HTTP client timeout properties are configured for the gateway.
+
+---
+
+## 3.7 — Configure API Versioning
+
+**Status:** Completed
+
+### Objective
+
+Introduce a centralized API version so future API changes can be managed without scattering version strings throughout the route configuration.
+
+### Configuration
+
+```properties
+api.version.current=v1
+api.version.base-path=/api/${api.version.current}
+```
+
+### Versioned Routes
+
+| API | Versioned Path |
+|---|---|
+| Authentication | `/api/v1/auth/**` |
+| User profiles | `/api/v1/users/**` |
+| JNV directory | `/api/v1/jnvs/**` |
+
+### Benefits
+
+- Keeps API versioning consistent across routes.
+- Makes the current API version configurable.
+- Provides a path-based versioning strategy.
+- Establishes a foundation for introducing a future API version.
+
+### Tests
+
+`ApiVersioningConfigurationTests` verify the version properties and the configured versioned route paths.
+
+### Result
+
+The current gateway routes use the centralized `/api/v1` base path.
+
+---
+
+## 3.8 — Gateway Error Handling
+
+**Status:** Implementation completed; additional integration testing remains
+
+### Objective
+
+Provide a consistent JSON error-response structure and avoid exposing internal exception details to API clients.
+
+### Implemented Files
+
+#### 1. `ApiErrorResponse.java`
+
+**Location:**
+
+`api-gateway/src/main/java/com/wearenavodayan/apigateway/exception/ApiErrorResponse.java`
+
+The response record contains:
+
+| Field | Purpose |
+|---|---|
+| `timestamp` | Time the error response was created |
+| `status` | HTTP status code |
+| `error` | Error category |
+| `message` | Client-facing message |
+| `path` | Request path |
+| `correlationId` | Request correlation identifier |
+
+#### 2. `ApiErrorResponseWriter.java`
+
+**Location:**
+
+`api-gateway/src/main/java/com/wearenavodayan/apigateway/exception/ApiErrorResponseWriter.java`
+
+The writer serializes error responses as JSON using the Jackson 3 `tools.jackson.databind.ObjectMapper` package used by this Spring Boot 4 application.
+
+It sets the HTTP status, JSON content type, UTF-8 character encoding, and correlation ID in the response body.
+
+#### 3. `GatewayExceptionHandler.java`
+
+**Location:**
+
+`api-gateway/src/main/java/com/wearenavodayan/apigateway/exception/GatewayExceptionHandler.java`
+
+The handler implements Spring MVC's `HandlerExceptionResolver`.
+
+It provides a generic HTTP 500 response with the message:
+
+`An unexpected error occurred.`
+
+Internal exception details are not returned to the client.
+
+### Testing
+
+`ApiErrorResponseWriterTests` cover:
+
+- Writing a JSON error response with HTTP 404.
+- Including the request correlation ID.
+- Preferring the response correlation ID when it is already present.
+- Writing the generic error message for HTTP 500.
+
+### Important Limitation
+
+The tests verify the error-response writer. They do not establish complete end-to-end behavior for every routing failure, downstream 404, connection refusal, timeout, or exception-resolution scenario.
+
+A separate filter that rewrote every `/api/` 404 was removed because it could incorrectly alter legitimate 404 responses returned by downstream services.
+
+The error-handling integration should be tested further before claiming comprehensive production-ready coverage.
+
+### Result
+
+The gateway has a standardized error-response model, a JSON response writer, and a generic exception resolver.
+
+---
+
+## Phase 3 — Testing and Verification
+
+### Targeted Gateway Test Command
+
+The following command was executed after implementing Phase 3.8:
+
+```powershell
+mvn -pl api-gateway clean test
+```
+
+### Result
+
+The latest recorded test run completed successfully:
+
+| Metric | Result |
+|---|---:|
+| Total tests | 19 |
+| Failures | 0 |
+| Errors | 0 |
+| Skipped | 0 |
+| Build status | BUILD SUCCESS |
+
+The test suite included gateway configuration and filter tests, as well as the error-response writer tests.
+
+Normal Mockito/ByteBuddy dynamic-agent warnings were observed and did not cause the test run to fail.
+
+### Verification Scope
+
+The successful test run confirms the covered configuration and unit-test behavior. It does not replace end-to-end tests for live downstream services, real timeout enforcement, or all exception-resolution scenarios.
+
+---
+
+## Phase 3 — Final Architecture
+
+```text
+Web / Mobile Applications
+          |
+          v
+   API Gateway :8080
+          |
+          +------------------------+
+          |            |           |
+          v            v           v
+     Auth Service   User Service  JNV Service
+       :8081          :8082         :8083
+          |            |             |
+          v            v             v
+       auth_db        user_db       jnv_db
+```
+
+### Gateway Responsibilities
+
+- Centralized API entry point.
+- Request routing.
+- Correlation ID generation and propagation.
+- CORS policy.
+- In-memory request rate limiting.
+- Centralized downstream service URL configuration.
+- HTTP client timeout configuration.
+- API versioning.
+- Standardized gateway error responses.
+- Actuator health and application information.
+
+The gateway routes requests; authentication and authorization will be implemented in the Auth Service and integrated with protected endpoints in a subsequent phase.
+
+---
+
+## Phase 3 — Final Checklist
+
+| Item | Status |
+|---|---|
+| API Gateway configuration | Completed |
+| Auth, User and JNV routes | Completed |
+| Correlation ID request filter | Completed |
+| CORS configuration | Completed |
+| In-memory rate limiting | Completed |
+| Service URLs and timeout properties | Configured; actual timeout behavior needs integration tests |
+| Centralized API versioning | Completed |
+| Standardized JSON error response | Implemented |
+| Gateway exception resolver | Implemented |
+| Targeted gateway tests | Passed |
+| End-to-end downstream failure and timeout tests | Outstanding |
+| Distributed production rate limiting | Future enhancement |
+
+---
+
+## Git History
+
+The following commits are recorded in the backend repository:
+
+| Commit | Description |
+|---|---|
+| `662945a` | Phase 3.4: Configure CORS for API Gateway |
+| `6fac6fc` | Phase 3.5: Configure API Gateway Rate Limiting |
+| `3e686e9` | Phase 3.6: Configure Service Communication |
+| `063c5a8` | Phase 3.7: Configure API Versioning |
+| `ccc6522` | Phase 3.8: Configure Gateway Error Handling |
+
+The repository was confirmed clean and synchronized with `origin/main` after the Phase 3.8 commit.
+
+---
+
+## Outstanding Work After Phase 3
+
+The following items remain relevant to the overall platform:
+
+- Add integration tests for real downstream connection failures and timeout enforcement.
+- Verify exception resolution and error responses through live HTTP requests.
+- Test gateway behavior when downstream services return 404, 5xx, or malformed responses.
+- Consider Redis-backed rate limiting for multi-instance production deployment.
+- Configure production-specific service URLs and secure deployment settings.
+- Implement authentication and authorization in the Auth Service.
+
+## Phase 3 Conclusion
+
+Phase 3 established the gateway foundation for the We Are Navodayan microservices platform. It includes service routing, request correlation, CORS, in-memory rate limiting, downstream HTTP client configuration, centralized API versioning, and standardized error-response handling.
+
+The targeted API Gateway test suite passed with 19 tests and no failures, errors, or skipped tests. Additional end-to-end testing remains necessary for production confidence.
+
+**Next planned milestone:** Phase 4 — Authentication & Authorization, beginning with authentication-flow design, followed by user registration, password hashing, login, JWT generation and validation, refresh-token rotation, Spring Security integration, role-based authorization, and authentication error handling.
