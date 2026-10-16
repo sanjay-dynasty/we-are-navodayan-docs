@@ -677,3 +677,226 @@ Configured centralized exports for error handling, formatting, and validation ut
 ## Phase 2 Commit
 
     git commit -m "feat(web): Phase 2 : API & Application Foundation"
+
+## Phase 3 — Authentication & Authorization
+
+### W3.1 — Implement User Registration
+
+Implemented the registration page and integrated it with the Spring Boot authentication API.
+
+Created:
+
+- `src/pages/Register/RegisterPage.tsx`
+- `src/pages/Register/RegisterPage.css`
+
+Configured:
+
+- Full name, email, and password fields
+- Required-field validation
+- Email format validation
+- Minimum password length of 12 characters
+- Registration API integration
+- Loading and error states
+- Navigation to login after successful registration
+
+Integrated with:
+
+- `POST /api/v1/auth/register`
+
+The backend returns the registered user's details inside an `ApiResponse` envelope.
+
+### W3.2 — Implement User Login
+
+Implemented the login page and integrated it with the backend authentication API.
+
+Updated:
+
+- `src/pages/Login/LoginPage.tsx`
+- `src/pages/Login/AuthPage.css`
+
+Configured:
+
+- Email and password fields
+- Login API integration
+- Loading and error states
+- Successful login handling
+- Redirect to the originally requested protected route
+- Navigation to registration
+
+Integrated with:
+
+- `POST /api/v1/auth/login`
+
+The login response provides access and refresh tokens along with authenticated user details.
+
+### W3.3 — Implement Logout
+
+Implemented client-side logout and authentication state cleanup.
+
+Updated:
+
+- `src/contexts/AuthContext.tsx`
+- `src/components/layout/Header/Header.tsx`
+- `src/services/api/auth/authService.ts`
+
+Configured:
+
+- Logout action in the authenticated header
+- Clearing locally stored access and refresh tokens
+- Clearing the authenticated user from application state
+- Redirecting the user to the login page
+
+**Note:** The current implementation performs client-side logout. Server-side refresh-token revocation is not implemented unless supported by a backend endpoint.
+
+### W3.4 — Integrate JWT Authentication
+
+Integrated JWT access-token handling into the centralized Axios API client.
+
+Updated:
+
+- `src/services/api/client/apiClient.ts`
+- `src/services/api/auth/authService.ts`
+
+Configured:
+
+- Automatic access-token attachment to authenticated API requests
+- `Authorization: Bearer <access-token>` header
+- Centralized API request handling
+- Integration with the Spring Boot authentication APIs
+
+### W3.5 — Implement Authentication State Management
+
+Implemented centralized authentication state management using React Context.
+
+Created:
+
+- `src/contexts/AuthContext.tsx`
+- `src/contexts/auth-context.ts`
+- `src/contexts/useAuth.ts`
+
+Updated:
+
+- `src/app/providers.tsx`
+
+Configured:
+
+- Authenticated user state
+- Authentication status
+- Authentication loading state
+- Login and logout actions
+- Shared authentication state through the `useAuth` hook
+- Session restoration when the application starts
+
+Integrated the authentication provider into the application provider hierarchy.
+
+### W3.6 — Implement Token Storage & Refresh
+
+Implemented browser-session token storage and refresh-token integration.
+
+Created:
+
+- `src/services/api/auth/tokenStorage.ts`
+
+Updated:
+
+- `src/services/api/auth/authService.ts`
+- `src/types/auth/auth.ts`
+- `src/types/auth/index.ts`
+- `src/types/index.ts`
+
+Configured:
+
+- Access-token storage using `sessionStorage`
+- Refresh-token storage using `sessionStorage`
+- Access-token retrieval for API requests
+- Refresh-token API integration
+- Updating stored tokens after a successful refresh
+- Clearing stored tokens when the session cannot be recovered
+
+Integrated with:
+
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/me`
+
+End-to-end verification of token expiry, refresh-token rotation, and failed-refresh behavior remains pending.
+
+### W3.7 — Implement Protected Routes
+
+Integrated authentication state with the existing protected-route implementation.
+
+Updated:
+
+- `src/components/common/ProtectedRoute/ProtectedRoute.tsx`
+- `src/app/router.tsx`
+
+Configured:
+
+- Authentication checks before rendering protected pages
+- Loading state while restoring the session
+- Redirect to login for unauthenticated users
+- Preservation of the originally requested route
+- Redirect to the requested route after successful login
+
+The `/profile` route uses the protected-route mechanism.
+
+### W3.8 — Prepare Role-Based Access Control
+
+Integrated role information into the authentication user model.
+
+Updated:
+
+- `src/types/auth/auth.ts`
+- `src/contexts/auth-context.ts`
+- `src/contexts/AuthContext.tsx`
+
+Configured:
+
+- Storage of the authenticated user's role in application state
+- Access to role information through the authentication context
+
+**Status:** Role-based route restrictions and permission enforcement are pending. Storing a user's role alone does not implement role-based authorization.
+
+### W3.9 — Implement Authentication Error Handling
+
+Integrated authentication forms with the centralized API error-handling foundation.
+
+Updated:
+
+- `src/pages/Login/LoginPage.tsx`
+- `src/pages/Register/RegisterPage.tsx`
+- `src/services/api/auth/authService.ts`
+- `src/services/api/client/apiClient.ts`
+
+Configured:
+
+- Login and registration error messages
+- Loading states during authentication requests
+- Centralized API error normalization
+- Handling of unsuccessful authentication requests
+- User feedback for failed login and registration attempts
+
+Additional integration testing is required for expired tokens, refresh failures, registration conflicts, and network errors.
+
+## Phase 3 Verification
+
+- ESLint: Passed
+- Production build: Passed
+- Git diff check: Passed
+- Development server: Started successfully
+- Login page rendering: Verified
+- Registration page rendering: Verified
+- Authentication context: Implemented
+- JWT request interceptor: Implemented
+- Token storage: Implemented
+- Refresh-token integration: Implemented
+- Protected-route integration: Implemented
+- Client-side logout: Implemented
+- End-to-end backend authentication: Pending verification
+- Token expiry and refresh scenarios: Pending verification
+- Role-based access enforcement: Pending implementation
+
+## Phase 3 Status
+
+**Implementation largely completed; integration verification pending.**
+
+Role-based access control and end-to-end authentication testing must be completed before marking all Phase 3 requirements as fully complete.
