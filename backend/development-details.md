@@ -2735,3 +2735,827 @@ Run from the backend repository:
 ## Final Outcome
 
 Phase 4 establishes the authentication and authorization foundation for We Are Navodayan. The auth service supports account registration, login, JWT-based access, refresh-token rotation, protected APIs, role-based access control, and standardized security error responses.
+
+# Phase 5 — User Profile Service
+Project: We Are Navodayan
+
+**Technology Stack:** Java 21, Spring Boot 4.1.1, Spring MVC, Spring Data JPA, Spring Security 7, Spring OAuth2 Resource Server, PostgreSQL 17, Flyway, Maven, JUnit 5, Mockito, MockMvc
+
+**Status:** Phase 5.1–5.10 implementation completed. User Profile Service tests passed with 72 tests, zero failures, zero errors, and zero skipped tests. Changes committed and pushed to `origin/main`.
+
+Latest Commit: `e7bd763` — `Phase 5.10 : Add Profile REST APIs`
+
+---
+
+# Phase 5 Overview
+
+Phase 5 establishes the User Profile Service for the We Are Navodayan platform. It manages alumni profile information separately from authentication credentials and provides the foundation for alumni discovery, networking, mentorship, and community features.
+
+The service uses PostgreSQL for persistence, Flyway for database migrations, Spring Data JPA for database access, and Spring Security for JWT-based endpoint protection.
+
+The User Profile Service runs on port `8082` and integrates with the Auth Service and JNV Service.
+
+## Objectives
+
+- Establish the User Profile Service and its database schema.
+- Integrate profile creation with user registration.
+- Implement profile completeness calculation.
+- Validate profile information and JNV references.
+- Add professional and location information.
+- Manage profile skills and interests.
+- Store profile image metadata.
+- Secure profile endpoints using JWT authentication.
+- Strengthen profile validation and ownership checks.
+- Expose profile retrieval and update APIs.
+- Standardize API error responses.
+- Verify service behavior through automated tests.
+
+---
+
+# Phase Checklist
+
+| Task | Description | Status |
+|---|---|---|
+| 5.1 | Establish User Profile Service foundation | Completed |
+| 5.2 | Integrate user registration with profile creation | Completed |
+| 5.3 | Implement profile completeness calculation | Completed |
+| 5.4 | Add JNV lookup and profile validation | Completed |
+| 5.5 | Add profession and location to profiles | Completed |
+| 5.6 | Implement profile skills and interests | Completed |
+| 5.7 | Add profile image metadata | Completed |
+| 5.8 | Secure profile routes with JWT | Completed |
+| 5.9 | Strengthen profile validation | Completed |
+| 5.10 | Add Profile REST APIs | Completed |
+
+---
+
+# 5.1 — Establish User Profile Service Foundation
+
+**Status: Completed**
+
+## Objective
+
+Establish a dedicated microservice for managing user profile information independently of authentication credentials.
+
+## Technology
+
+- Java 21
+- Spring Boot 4.1.1
+- Spring MVC
+- Spring Data JPA
+- PostgreSQL 17
+- Flyway
+- Maven
+
+## Architecture
+
+The User Profile Service manages alumni information, while the Auth Service manages account credentials and authentication.
+
+The authentication account ID is stored as `authUserId` in the user profile.
+
+This separation allows authentication and profile management to evolve independently.
+
+## Database
+
+Database: `user_db`
+
+The database schema is managed through Flyway migrations.
+
+The service uses UUID identifiers for profile records and authentication account references.
+
+## Core Responsibilities
+
+- Create and retrieve user profiles.
+- Associate profiles with authentication accounts.
+- Persist profile information in PostgreSQL.
+- Validate profile data through the service layer.
+- Maintain profile creation and update timestamps.
+- Manage database schema changes through versioned migrations.
+
+## Result
+
+The User Profile Service foundation provides a dedicated persistence and business-logic layer for alumni profile information.
+
+---
+
+# 5.2 — Integrate User Registration with Profile Creation
+
+**Status: Completed**
+
+## Objective
+
+Automatically create a user profile when a new account is registered through the Auth Service.
+
+## Implementation
+
+Profile creation is initiated through an internal API exposed by the User Profile Service.
+
+**Internal endpoint:**
+
+`POST /internal/api/v1/user-profiles`
+
+The registration workflow supplies the authentication account UUID and the user's full name.
+
+## Registration Flow
+
+1. A user submits a registration request to the Auth Service.
+2. The Auth Service validates the registration details.
+3. The account is created in the authentication database.
+4. The Auth Service initiates profile creation through the internal User Profile Service API.
+5. The User Profile Service validates the supplied account ID and full name.
+6. A profile is persisted in `user_db`.
+7. The profile is associated with the authentication account through `authUserId`.
+
+## Validation and Duplicate Handling
+
+- Authentication account ID is required.
+- Full name is required.
+- Full name must not exceed 150 characters.
+- Duplicate profiles for the same authentication account are prevented.
+- An existing profile with matching registration details is handled idempotently.
+- An existing profile with conflicting registration details returns a conflict.
+- The internal endpoint requires the configured internal service key.
+
+## Result
+
+User registration is integrated with profile creation, establishing the relationship between authentication accounts and user profiles.
+
+---
+
+# 5.3 — Implement Profile Completeness Calculation
+
+**Status: Completed**
+
+## Objective
+
+Calculate a profile completeness percentage to help users identify missing profile information.
+
+## Implementation
+
+File:
+
+`user-service/src/main/java/com/wearenavodayan/userservice/service/ProfileCompletenessCalculator.java`
+
+The calculator evaluates five profile attributes.
+
+| Profile Attribute | Weight |
+|---|---:|
+| Full name | 20% |
+| Bio | 20% |
+| Batch year | 20% |
+| JNV association | 20% |
+| Profile image URL | 20% |
+| **Total** | **100%** |
+
+## Calculation Rules
+
+Each completed attribute contributes 20 percentage points.
+
+A profile with all five attributes populated receives 100%.
+
+The calculation is performed using the profile information available to the service.
+
+## Testing
+
+`ProfileCompletenessCalculatorTest` covers five test cases.
+
+The tests verify completeness calculations for different combinations of populated and missing profile attributes.
+
+## Result
+
+Profile completeness is calculated by a dedicated service component and can be included in profile API responses.
+
+---
+
+# 5.4 — Add JNV Lookup and Profile Validation
+
+**Status: Completed**
+
+## Objective
+
+Associate alumni profiles with Jawahar Navodaya Vidyalaya records and validate profile information before persistence.
+
+## Implementation
+
+The User Profile Service integrates with the JNV Service through a dedicated service client.
+
+The JNV association is stored using `jnvId`.
+
+## Validation Rules
+
+- Authentication account ID is required.
+- Full name is required.
+- Full name must not exceed 150 characters.
+- Optional text fields are validated against their configured length limits.
+- Batch year must be between 1900 and 2200 when supplied.
+- A supplied JNV identifier is validated against the JNV Service.
+- Profile image URLs must use HTTP or HTTPS and contain a valid host.
+
+## JNV Association
+
+When a profile includes a JNV identifier, the service validates the association before accepting the profile change.
+
+A profile without a JNV association can retain a null `jnvId`.
+
+## Result
+
+The User Profile Service supports JNV associations and validates profile data before it is persisted.
+
+---
+
+# 5.5 — Add Profession and Location to Profiles
+
+**Status: Completed**
+
+## Objective
+
+Extend user profiles with professional information and current location to support alumni discovery and networking.
+
+## Profile Fields
+
+| Field | Description |
+|---|---|
+| `profession` | User's profession |
+| `organization` | Current organization |
+| `jobTitle` | Current job title |
+| `currentCity` | Current city |
+| `currentState` | Current state |
+| `country` | Current country |
+
+## Validation Limits
+
+| Field | Maximum Length |
+|---|---:|
+| Profession | 100 characters |
+| Organization | 150 characters |
+| Job title | 150 characters |
+| Current city | 100 characters |
+| Current state | 100 characters |
+| Country | 100 characters |
+
+These fields are optional.
+
+Optional text is normalized before it is stored.
+
+## Benefits
+
+- Supports professional alumni discovery.
+- Enables location-based networking.
+- Provides information relevant to mentorship.
+- Establishes a foundation for future directory filters.
+
+## Result
+
+The profile model supports professional and location information in addition to core identity fields.
+
+---
+
+# 5.6 — Implement Profile Skills and Interests
+
+**Status: Completed**
+
+## Objective
+
+Allow users to maintain skills and interests separately from their core profile attributes.
+
+## Implementation
+
+A dedicated `UserProfileSkillsInterestsService` manages skills and interests.
+
+The service provides operations to:
+
+- Retrieve a user's skills.
+- Retrieve a user's interests.
+- Replace the complete skills list.
+- Replace the complete interests list.
+
+## Validation and Normalization
+
+- Maximum 30 skills per user.
+- Maximum 30 interests per user.
+- Values are trimmed.
+- Duplicate values are removed.
+- Values are validated before being persisted.
+
+## Service Methods
+
+- `getSkills(UUID authUserId)`
+- `getInterests(UUID authUserId)`
+- Replace skills operation.
+- Replace interests operation.
+
+## Testing
+
+`UserProfileSkillsInterestsServiceTest` covers 11 test cases.
+
+## Benefits
+
+Skills and interests establish a foundation for:
+
+- Alumni discovery.
+- Mentorship matching.
+- Professional networking.
+- Community recommendations.
+- Interest-based connections.
+
+## Result
+
+Skills and interests are managed through a dedicated service component and can be included in profile responses.
+
+---
+
+# 5.7 — Add Profile Image Metadata
+
+**Status: Completed**
+
+## Objective
+
+Establish support for profile image metadata as a foundation for future image uploads and object storage integration.
+
+## Implementation
+
+Profile image metadata is managed through the profile image metadata functionality.
+
+The database schema includes profile image metadata introduced through Flyway migration V5.
+
+## Image Validation
+
+- Profile image URL is optional.
+- Blank optional values are normalized.
+- Nonblank URLs must use HTTP or HTTPS.
+- URLs must contain a valid host.
+- Invalid or unsupported URL schemes are rejected.
+
+## Storage Considerations
+
+The current implementation supports profile image metadata.
+
+**Actual image upload to Amazon S3 is not implemented as part of this phase.**
+
+S3 upload integration, secure upload authorization, image validation, and image lifecycle management remain future work.
+
+## Testing
+
+`ProfileImageMetadataServiceTest` covers seven test cases.
+
+## Result
+
+The User Profile Service has the metadata foundation required for future profile image storage integration.
+
+---
+
+# 5.8 — Secure Profile Routes with JWT
+
+**Status: Completed**
+
+## Objective
+
+Protect profile APIs using JWT authentication and prevent unauthenticated access to protected profile operations.
+
+## Technology
+
+- Spring Security 7
+- Spring OAuth2 Resource Server
+- JWT
+- Stateless security configuration
+
+## JWT Configuration
+
+The User Profile Service validates access tokens using the configured JWT secret.
+
+| Setting | Value |
+|---|---|
+| Issuer | `we-are-navodayan-auth` |
+| Audience | `we-are-navodayan-api` |
+| Signing algorithm | HS256 |
+| Identity claim | `sub` |
+| Secret source | `JWT_SECRET` environment variable |
+
+The JWT subject contains the authentication account UUID.
+
+The service resolves the authenticated account ID from the validated JWT subject.
+
+## Security Rules
+
+- Profile APIs require authentication.
+- Invalid or expired JWTs are rejected.
+- The service uses stateless authentication.
+- Health and information endpoints are public according to the security configuration.
+- Internal profile creation is restricted through the internal service-key check.
+- Other internal endpoints remain protected.
+
+## Secret Management
+
+The JWT secret is supplied through environment configuration rather than committed to source control.
+
+The Base64-decoded signing secret must contain at least 32 bytes.
+
+Production secrets must be generated and managed securely.
+
+## Testing
+
+`UserServiceJwtSecurityIntegrationTests` covers nine test cases.
+
+## Result
+
+The User Profile Service validates JWTs and establishes the authenticated identity used by profile operations.
+
+---
+
+# 5.9 — Strengthen Profile Validation
+
+**Status: Completed**
+
+## Objective
+
+Strengthen service-layer validation and ensure that profile updates preserve the relationship between a profile and its authentication account.
+
+## Validation
+
+The service validates:
+
+- Required authentication account ID.
+- Required full name.
+- Text-field maximum lengths.
+- Batch year boundaries.
+- Profile image URL format.
+- JNV association when supplied.
+- Profile existence.
+- Profile ownership during updates.
+
+## Profile Ownership
+
+The authentication account ID associated with an existing profile cannot be changed through the update operation.
+
+The update operation checks that the existing profile and the submitted candidate profile belong to the same authentication account.
+
+## Normalization
+
+Text values are normalized before persistence.
+
+Optional text fields can be cleared by submitting null or blank values, subject to the existing service validation and normalization rules.
+
+## Profile Update Safety
+
+The REST controller constructs a separate candidate profile for validation and update instead of modifying the managed entity before validation.
+
+This prevents invalid input from mutating the existing managed entity before the service validates the requested changes.
+
+## Database and Transaction Testing
+
+The implementation includes transaction-related tests for profile persistence and update behavior.
+
+`UserProfileServiceTest` covers 17 test cases.
+
+`UserProfileTransactionTests` covers five test cases.
+
+## Result
+
+Profile updates enforce ownership consistency and use the existing business validation rules before persistence.
+
+---
+
+# 5.10 — Add Profile REST APIs
+
+**Status: Completed**
+
+## Objective
+
+Expose profile retrieval and update operations through authenticated REST endpoints for integration with the web and mobile applications.
+
+## Implementation
+
+Controller:
+
+`user-service/src/main/java/com/wearenavodayan/userservice/controller/UserProfileController.java`
+
+Request DTO:
+
+`user-service/src/main/java/com/wearenavodayan/userservice/dto/request/UserProfileUpdateRequest.java`
+
+Response DTO:
+
+`user-service/src/main/java/com/wearenavodayan/userservice/dto/response/UserProfileResponse.java`
+
+Exception handler:
+
+`user-service/src/main/java/com/wearenavodayan/userservice/exception/GlobalExceptionHandler.java`
+
+## API Endpoints
+
+Base path:
+
+`/api/v1/user-profiles`
+
+All three profile endpoints require a valid JWT.
+
+### 1. Get the Authenticated User's Profile
+
+**Method:** GET
+
+**Endpoint:**
+
+`GET /api/v1/user-profiles/me`
+
+Purpose:
+
+Retrieve the profile associated with the authentication account in the JWT subject.
+
+Successful response:
+
+HTTP 200 OK
+
+The response includes the user's profile information, skills, interests, profile completeness, and timestamps.
+
+### 2. Update the Authenticated User's Profile
+
+**Method:** PUT
+
+**Endpoint:**
+
+`PUT /api/v1/user-profiles/me`
+
+Purpose:
+
+Update the editable profile fields for the authenticated user.
+
+The authentication account ID is taken from the existing profile and is not accepted as a mutable field in the request DTO.
+
+The service validates the candidate profile before applying the update.
+
+**Update semantics:** This endpoint uses full-replacement semantics. Clients should send the complete set of editable profile fields. Omitted properties deserialize as null and may clear existing optional values.
+
+Successful response:
+
+HTTP 200 OK
+
+### 3. Get a Profile by ID
+
+**Method:** GET
+
+**Endpoint:**
+
+`GET /api/v1/user-profiles/{id}`
+
+Purpose:
+
+Retrieve a profile using its profile UUID.
+
+This supports authenticated profile lookup for alumni directory and networking use cases.
+
+The endpoint requires authentication, but it does not implement profile-visibility preferences or a separate public-versus-private profile policy.
+
+Before production deployment, profile visibility and privacy rules should be defined and enforced.
+
+## Request DTO
+
+`UserProfileUpdateRequest` includes:
+
+- `fullName`
+- `bio`
+- `batchYear`
+- `jnvId`
+- `profileImageUrl`
+- `profession`
+- `organization`
+- `jobTitle`
+- `currentCity`
+- `currentState`
+- `country`
+
+The request does not expose authentication account ownership as an editable field.
+
+## Response DTO
+
+`UserProfileResponse` includes:
+
+- Profile UUID.
+- Full name.
+- Bio.
+- Batch year.
+- JNV UUID.
+- Profile image URL.
+- Profession.
+- Organization.
+- Job title.
+- Current city.
+- Current state.
+- Country.
+- Skills.
+- Interests.
+- Profile completeness percentage.
+- Creation timestamp.
+- Last update timestamp.
+
+Internal image storage metadata is not included in this response DTO.
+
+## Standardized Error Handling
+
+The global exception handler returns the existing `ApiResponse` envelope.
+
+Response structure:
+
+    {
+      "success": false,
+      "data": null,
+      "message": "Error description"
+    }
+
+Implemented mappings:
+
+| Exception Category | HTTP Status |
+|---|---|
+| Entity not found | 404 Not Found |
+| Illegal argument or validation error | 400 Bad Request |
+| Illegal state or conflict | 409 Conflict |
+| Response status exception | Corresponding HTTP status |
+| Missing or invalid JSON | 400 Bad Request |
+| Missing resource or endpoint | 404 Not Found |
+| Unexpected exception | 500 Internal Server Error |
+
+Unexpected exceptions return a generic client-facing message rather than exposing internal exception details.
+
+## Testing
+
+`UserProfileControllerTest` covers seven test cases.
+
+`GlobalExceptionHandlerTest` covers five test cases.
+
+The tests verify controller behavior and consistent error-response handling.
+
+## Result
+
+The User Profile Service exposes authenticated profile retrieval and update APIs with response DTOs and standardized application error responses.
+
+---
+
+# Phase 5 — Testing and Verification
+
+## Test Execution
+
+Run the following commands from the backend repository:
+
+    $env:DB_PASSWORD = "navodayan_local"
+    $env:JAVA_TOOL_OPTIONS = "-Duser.timezone=UTC"
+    $env:JWT_SECRET = [Convert]::ToBase64String(
+        [System.Text.Encoding]::UTF8.GetBytes("0123456789abcdef0123456789abcdef")
+    )
+
+    mvn -pl user-service clean test
+
+The JWT secret shown above is a local test-only value. Do not use it as a production secret.
+
+## Latest Recorded Test Results
+
+| Test Class | Tests | Failures | Errors |
+|---|---:|---:|---:|
+| UserProfileControllerTest | 7 | 0 | 0 |
+| GlobalExceptionHandlerTest | 5 | 0 | 0 |
+| ProfileCompletenessCalculatorTest | 5 | 0 | 0 |
+| ProfileImageMetadataServiceTest | 7 | 0 | 0 |
+| UserProfileServiceTest | 17 | 0 | 0 |
+| UserProfileSkillsInterestsServiceTest | 11 | 0 | 0 |
+| UserProfileTransactionTests | 5 | 0 | 0 |
+| UserServiceApplicationTests | 6 | 0 | 0 |
+| UserServiceJwtSecurityIntegrationTests | 9 | 0 | 0 |
+| **Total** | **72** | **0** | **0** |
+
+**Build Status:** BUILD SUCCESS
+
+**Skipped Tests:** 0
+
+The recorded run completed successfully against PostgreSQL 17.11 with Flyway schema version 5.
+
+Mockito/ByteBuddy dynamic-agent warnings and a duplicate-key warning during a database test were observed. They did not cause the test suite to fail.
+
+## Verification Scope
+
+The successful test run verifies the compilation and behavior covered by the 72 tests.
+
+It does not establish complete production readiness for every integration scenario, including:
+
+- End-to-end authentication registration-to-profile creation under service failures.
+- Public profile visibility and privacy enforcement.
+- Profile image uploads to S3.
+- Production deployment configuration.
+- Load and performance behavior.
+- Distributed rate limiting and other gateway concerns.
+
+These should be addressed as the corresponding platform capabilities are implemented.
+
+---
+
+# Phase 5 — Final Architecture
+
+    Web Application / Mobile Application
+                  |
+                  v
+          API Gateway :8080
+                  |
+                  v
+            Auth Service :8081
+                  |
+                  | Internal profile creation
+                  v
+           User Service :8082
+                  |
+                  v
+             user_db
+                  |
+                  | JNV validation through service client
+                  v
+             JNV Service :8083
+                  |
+                  v
+              jnv_db
+
+The Auth Service manages credentials and authentication. The User Profile Service manages profile data and associated skills and interests. The JNV Service provides JNV records used to validate profile associations.
+
+## User Profile Service Responsibilities
+
+- Profile persistence and retrieval.
+- Association with authentication accounts.
+- Profile completeness calculation.
+- Profile validation and normalization.
+- JNV association validation.
+- Professional and location information.
+- Skills and interests management.
+- Profile image metadata.
+- JWT authentication.
+- Profile ownership validation.
+- Authenticated profile retrieval and update APIs.
+- Standardized error responses.
+- Database migration management.
+
+---
+
+# Phase 5 — Final Checklist
+
+| Item | Status |
+|---|---|
+| User Profile Service foundation | Completed |
+| Profile creation integration | Completed |
+| Profile completeness calculation | Completed |
+| JNV lookup and validation | Completed |
+| Profession and location fields | Completed |
+| Skills and interests | Completed |
+| Profile image metadata | Completed |
+| JWT-protected profile routes | Completed |
+| Profile validation and ownership checks | Completed |
+| Profile REST APIs | Completed |
+| Standardized API error responses | Completed |
+| Unit and integration tests | Passed |
+| 72 tests with zero failures or errors | Passed |
+| Changes committed | Completed |
+| Changes pushed to `origin/main` | Completed |
+
+---
+
+# Git History
+
+The following Phase 5 commits are recorded in the backend repository:
+
+| Commit | Description |
+|---|---|
+| `a2cb585` | Phase 5.2 : Integrate User Registration with Profile Creation |
+| `26fce4b` | Phase 5.3 : Add Profile Completeness Calculation |
+| `933ff2c` | Phase 5.4 : Add JNV Lookup and Profile Validation |
+| `6d0dbb6` | Phase 5.5 : Add Profession and Location to Profiles |
+| `85c6936` | Phase 5.6 : Add Profile Skills and Interests |
+| `ea1ff5b` | Phase 5.7 : Add Profile Image Metadata |
+| `e057241` | Phase 5.8 : Secure Profile Routes with JWT |
+| `2340b4e` | Phase 5.9 : Strengthen Profile Validation |
+| `e7bd763` | Phase 5.10 : Add Profile REST APIs |
+
+The latest recorded commit was pushed to `origin/main`.
+
+Note: The Phase 5.1 commit is not included in the history above because its commit identifier and message were not confirmed in the available project record.
+
+---
+
+# Outstanding Work After Phase 5
+
+The following improvements remain relevant to the overall platform:
+
+1. Implement the web application's authentication flow.
+2. Integrate the web profile page with the profile REST APIs.
+3. Define and enforce profile visibility and privacy rules.
+4. Implement profile image upload and storage through Amazon S3.
+5. Complete the JNV directory service and web directory integration.
+6. Add broader end-to-end tests for cross-service registration and profile creation.
+7. Add production-specific configuration, monitoring, and deployment verification.
+8. Add profile pagination and filtering as the alumni directory grows.
+9. Define appropriate API-level rate limits and abuse protections.
+10. Review database constraint violations and error mappings for consistent client-facing behavior.
+
+---
+
+# Phase 5 Conclusion
+
+Phase 5 establishes the User Profile Service as the foundation for alumni identity and professional networking in We Are Navodayan.
+
+The service now supports profile creation integration, profile completeness, JNV association validation, professional and location fields, skills and interests, image metadata, JWT-protected routes, profile validation, authenticated profile retrieval, and profile updates.
+
+The latest recorded test run passed all 72 tests with no failures, errors, or skipped tests. The Phase 5.10 implementation was committed and pushed to `origin/main` as `e7bd763`.
+
+The implementation is a solid foundation for the next stage of the platform, while privacy policy enforcement, S3 image uploads, broader end-to-end testing, and production hardening remain future work.
