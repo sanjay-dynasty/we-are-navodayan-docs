@@ -1,452 +1,377 @@
-# We Are Navodayan — Infrastructure Development Roadmap
+# We Are Navodayan — Simplified Infrastructure Development Roadmap
 
-## Phase 0 — Infrastructure & Cloud Foundation
+## Phase 1 — Foundation & Infrastructure as Code
 
-### 0.1 Understand Infrastructure Requirements
-### 0.2 Define AWS Account Structure
-### 0.3 Configure AWS CLI
-### 0.4 Configure AWS IAM
-### 0.5 Configure AWS Profiles
-### 0.6 Define AWS Regions
-### 0.7 Define Environment Strategy
-### 0.8 Define Infrastructure Naming Convention
-### 0.9 Define Resource Tagging Strategy
-### 0.10 Configure Infrastructure Repository Structure
+### 1.1 Infrastructure Requirements
+- Define application infrastructure requirements.
+- Finalize the cost-conscious AWS architecture.
+- Define expected traffic and scalability requirements.
 
----
+### 1.2 AWS Foundation
+- Configure AWS CLI and IAM.
+- Configure AWS profiles.
+- Select AWS region (`ap-south-1`).
+- Define environment strategy.
+- Establish naming conventions and resource tags.
 
-# Phase 1 — Infrastructure as Code Foundation
+### 1.3 CDK Project Setup
+- Initialize AWS CDK with TypeScript.
+- Configure CDK context and environment settings.
+- Define stack structure and reusable constructs.
+- Configure infrastructure outputs.
+- Configure CDK synthesis and diff workflows.
 
-### 1.1 Install AWS CDK
-### 1.2 Configure CDK Project
-### 1.3 Configure TypeScript for CDK
-### 1.4 Configure CDK Context
-### 1.5 Define CDK Application Structure
-### 1.6 Define Stack Structure
-### 1.7 Define Reusable Constructs
-### 1.8 Configure Environment-Specific Stacks
-### 1.9 Configure CDK Outputs
-### 1.10 Bootstrap AWS Environment
-### 1.11 Configure CDK Synth
-### 1.12 Configure CDK Diff
-### 1.13 Configure CDK Deploy
+### 1.4 Infrastructure Validation
+- Write CDK unit tests.
+- Validate generated CloudFormation templates.
+- Review infrastructure changes before deployment.
+- Bootstrap the AWS environment.
 
 ---
 
-# Phase 2 — Network Infrastructure
+## Phase 2 — Minimal VPC Networking
 
-### 2.1 Design VPC Architecture
-### 2.2 Create VPC
-### 2.3 Configure Availability Zones
-### 2.4 Configure Public Subnets
-### 2.5 Configure Private Application Subnets
-### 2.6 Configure Private Database Subnets
-### 2.7 Configure Internet Gateway
-### 2.8 Configure NAT Gateway
-### 2.9 Configure Route Tables
-### 2.10 Configure Network ACLs
-### 2.11 Configure VPC Endpoints
-### 2.12 Configure Security Groups
-### 2.13 Configure VPC Flow Logs
-### 2.14 Network Connectivity Testing
+### 2.1 Network Architecture
+- Define VPC architecture and CIDR ranges.
+- Configure two Availability Zones.
+- Define public, application, and database subnet tiers.
+- Review network design against the cost budget.
 
----
+### 2.2 VPC and Subnets
+- Create the VPC.
+- Configure public subnets.
+- Configure private application subnets.
+- Configure isolated database subnets.
+- Configure the Internet Gateway.
 
-# Phase 3 — Security Foundation
+### 2.3 Routing
+- Configure public subnet route tables.
+- Configure private application subnet routing.
+- Configure database subnet routing.
+- Verify internet access and isolation requirements.
 
-### 3.1 Define IAM Strategy
-### 3.2 Create IAM Roles
-### 3.3 Create IAM Policies
-### 3.4 Apply Least Privilege
-### 3.5 Configure AWS KMS
-### 3.6 Configure Secrets Manager
-### 3.7 Configure Parameter Store
-### 3.8 Configure Encryption Standards
-### 3.9 Configure Security Groups
-### 3.10 Configure AWS WAF
-### 3.11 Configure CloudTrail
-### 3.12 Configure Security Monitoring
-### 3.13 Security Baseline Verification
+### 2.4 Network Security
+- Configure security groups.
+- Restrict database access to the backend.
+- Review default network ACLs.
+- Add VPC endpoints only when justified by cost and requirements.
+
+### 2.5 Network Validation
+- Test subnet configuration and routing.
+- Validate security group rules.
+- Verify database isolation.
+- Review the need for NAT Gateway and VPC Flow Logs before enabling them.
 
 ---
 
-# Phase 4 — Container Platform
+## Phase 3 — Security & Secrets
 
-### 4.1 Define Container Architecture
-### 4.2 Create Docker Standards
-### 4.3 Create Dockerfiles
-### 4.4 Configure Multi-Stage Builds
-### 4.5 Create Amazon ECR Repositories
-### 4.6 Configure Image Tagging
-### 4.7 Configure Image Scanning
-### 4.8 Configure ECS Cluster
-### 4.9 Configure ECS Capacity
-### 4.10 Configure ECS Task Definitions
-### 4.11 Configure ECS Services
-### 4.12 Configure Service Discovery
-### 4.13 Configure Container Logging
-### 4.14 Configure Health Checks
-### 4.15 Configure Auto Scaling
+### 3.1 IAM Foundation
+- Define IAM roles for infrastructure and application services.
+- Configure least-privilege IAM policies.
+- Configure ECS task execution and application task roles.
+- Restrict access to AWS resources.
 
----
+### 3.2 Secrets Management
+- Select AWS Secrets Manager or SSM Parameter Store as appropriate.
+- Store database credentials securely.
+- Store JWT signing keys and application secrets.
+- Configure access to secrets from the backend.
+- Keep credentials out of source control.
 
-# Phase 5 — Load Balancing & API Entry
+### 3.3 Encryption and HTTPS
+- Configure encryption for supported AWS resources.
+- Define database encryption settings.
+- Prepare TLS certificates for HTTPS.
+- Enforce HTTPS for public application endpoints.
 
-### 5.1 Define API Entry Architecture
-### 5.2 Configure Application Load Balancer
-### 5.3 Configure Target Groups
-### 5.4 Configure Health Checks
-### 5.5 Configure Listener Rules
-### 5.6 Configure HTTPS
-### 5.7 Configure TLS Certificates
-### 5.8 Configure API Gateway Where Required
-### 5.9 Configure API Routing
-### 5.10 Configure Rate Limiting
-### 5.11 Configure CORS
-### 5.12 Configure WAF Integration
-### 5.13 Load Balancer Testing
+### 3.4 Security Validation
+- Review IAM permissions.
+- Validate security group rules.
+- Verify secret access restrictions.
+- Check public access settings for storage resources.
+- Review essential AWS audit and security settings.
 
 ---
 
-# Phase 6 — Database Infrastructure
+## Phase 4 — PostgreSQL Database Infrastructure
 
-### 6.1 Design Database Infrastructure
-### 6.2 Create Amazon RDS PostgreSQL
-### 6.3 Configure Database Subnets
-### 6.4 Configure Database Security Groups
-### 6.5 Configure Encryption
-### 6.6 Configure Database Credentials
-### 6.7 Configure Secrets Manager Integration
-### 6.8 Configure Automated Backups
-### 6.9 Configure Multi-AZ
-### 6.10 Configure Database Parameter Groups
-### 6.11 Configure Monitoring
-### 6.12 Configure Maintenance Windows
-### 6.13 Configure Database Scaling
-### 6.14 Database Connectivity Testing
-### 6.15 Backup & Recovery Testing
+### 4.1 Database Design
+- Define database requirements.
+- Select an appropriate RDS PostgreSQL instance size.
+- Estimate storage and monthly database costs.
+- Decide on single-AZ or Multi-AZ deployment.
 
----
+### 4.2 RDS Setup
+- Create an RDS PostgreSQL instance.
+- Configure database subnet groups.
+- Place the database in private or isolated subnets.
+- Configure the database security group.
+- Enable encryption.
 
-# Phase 7 — Redis Infrastructure
+### 4.3 Database Configuration
+- Configure database credentials.
+- Integrate secrets management.
+- Configure storage and backup retention.
+- Configure essential maintenance settings.
+- Review database connectivity requirements.
 
-### 7.1 Define Caching Architecture
-### 7.2 Create Amazon ElastiCache
-### 7.3 Configure Redis
-### 7.4 Configure Redis Subnets
-### 7.5 Configure Redis Security Groups
-### 7.6 Configure Encryption
-### 7.7 Configure Authentication
-### 7.8 Configure Redis Parameters
-### 7.9 Configure Monitoring
-### 7.10 Configure Redis Scaling
-### 7.11 Redis Connectivity Testing
-### 7.12 Cache Failure Testing
+### 4.4 Backend Connectivity
+- Configure Spring Boot database properties.
+- Configure connection pooling.
+- Validate database connectivity from the backend.
+- Test migrations and schema initialization.
 
----
-
-# Phase 8 — Kafka & Event Streaming Infrastructure
-
-### 8.1 Define Event-Driven Architecture
-### 8.2 Design Kafka Infrastructure
-### 8.3 Create Amazon MSK Cluster
-### 8.4 Configure MSK Networking
-### 8.5 Configure MSK Security
-### 8.6 Configure Authentication
-### 8.7 Configure Encryption
-### 8.8 Configure Kafka Brokers
-### 8.9 Configure Kafka Storage
-### 8.10 Configure Kafka Topics
-### 8.11 Configure Topic Retention
-### 8.12 Configure Consumer Groups
-### 8.13 Configure Monitoring
-### 8.14 Configure Kafka Alerts
-### 8.15 Kafka Connectivity Testing
-### 8.16 Kafka Failure & Recovery Testing
+### 4.5 Database Validation
+- Verify that public database access is disabled.
+- Test authorized database connectivity.
+- Verify automated backups.
+- Document the database recovery procedure.
 
 ---
 
-# Phase 9 — S3 & Media Infrastructure
+## Phase 5 — Backend Deployment
 
-### 9.1 Define Media Architecture
-### 9.2 Create S3 Buckets
-### 9.3 Configure Bucket Policies
-### 9.4 Configure Block Public Access
-### 9.5 Configure Encryption
-### 9.6 Configure Versioning
-### 9.7 Configure Lifecycle Policies
-### 9.8 Configure CORS
-### 9.9 Configure Pre-Signed URL Access
-### 9.10 Configure Media Storage Structure
-### 9.11 Configure CloudFront
-### 9.12 Configure CDN Caching
-### 9.13 Configure Media Security
-### 9.14 Configure S3 Monitoring
-### 9.15 S3 Access Testing
+### 5.1 Containerization
+- Define the backend container architecture.
+- Create Dockerfiles for required Spring Boot services.
+- Configure multi-stage Docker builds.
+- Configure application health checks.
+- Test containers locally.
 
----
+### 5.2 Container Registry
+- Create Amazon ECR repositories.
+- Configure image tagging.
+- Push application images to ECR.
+- Enable image scanning where appropriate.
 
-# Phase 10 — Frontend Web Infrastructure
+### 5.3 Compute Platform
+- Create an ECS cluster.
+- Configure ECS Fargate task definitions.
+- Configure CPU and memory settings.
+- Configure environment variables and secret injection.
+- Deploy the required backend services.
+- Configure logging and health checks.
 
-### 10.1 Define Web Hosting Architecture
-### 10.2 Build React Web Application
-### 10.3 Create Web S3 Bucket
-### 10.4 Configure Static Website Hosting
-### 10.5 Configure CloudFront Distribution
-### 10.6 Configure Origin Access Control
-### 10.7 Configure HTTPS
-### 10.8 Configure Route 53
-### 10.9 Configure Custom Domain
-### 10.10 Configure SPA Routing
-### 10.11 Configure Cache Policies
-### 10.12 Configure Compression
-### 10.13 Web Deployment Testing
+### 5.4 API Entry Point
+- Select a suitable API entry architecture.
+- Configure an Application Load Balancer or another suitable API entry service.
+- Configure target groups and health checks where applicable.
+- Configure HTTPS and API routing.
+- Configure CORS and application-level rate limiting.
 
----
-
-# Phase 11 — DNS & Domain Infrastructure
-
-### 11.1 Define Domain Strategy
-### 11.2 Configure Route 53 Hosted Zone
-### 11.3 Configure DNS Records
-### 11.4 Configure API Subdomain
-### 11.5 Configure Web Subdomain
-### 11.6 Configure CDN Domain
-### 11.7 Configure Certificate Manager
-### 11.8 Configure DNS Validation
-### 11.9 Configure HTTPS Redirect
-### 11.10 DNS Verification
+### 5.5 Backend Validation
+- Verify application health.
+- Test authentication and authorization.
+- Validate database connectivity.
+- Test API endpoints.
+- Verify application logs and error handling.
+- Review deployment and compute costs.
 
 ---
 
-# Phase 12 — Secrets & Configuration Management
+## Phase 6 — React Website Deployment
 
-### 12.1 Define Configuration Strategy
-### 12.2 Define Environment Variables
-### 12.3 Configure AWS Secrets Manager
-### 12.4 Configure SSM Parameter Store
-### 12.5 Store Database Credentials
-### 12.6 Store Application Secrets
-### 12.7 Store Third-Party Credentials
-### 12.8 Configure ECS Secret Injection
-### 12.9 Configure Secret Rotation
-### 12.10 Verify Secret Access
+### 6.1 Frontend Build
+- Configure production environment variables.
+- Configure the backend API base URL.
+- Build the React application.
+- Verify production assets and routing.
 
----
+### 6.2 Static Hosting
+- Create an S3 bucket for frontend assets.
+- Configure private bucket access.
+- Configure CloudFront distribution.
+- Configure Origin Access Control.
+- Prevent direct public access to the origin bucket.
 
-# Phase 13 — Asynchronous AWS Services
+### 6.3 HTTPS and Caching
+- Configure HTTPS through CloudFront.
+- Configure cache policies.
+- Configure compression.
+- Configure SPA routing and error handling.
+- Define cache invalidation procedures.
 
-### 13.1 Define Asynchronous Processing Requirements
-### 13.2 Configure Amazon SQS
-### 13.3 Configure Dead Letter Queues
-### 13.4 Configure Queue Policies
-### 13.5 Configure Message Retention
-### 13.6 Configure Visibility Timeout
-### 13.7 Configure SNS
-### 13.8 Configure SNS Topics
-### 13.9 Configure Subscriptions
-### 13.10 Configure Event Notifications
-### 13.11 Integrate SQS with Services
-### 13.12 Integrate SNS with Services
-### 13.13 Configure Retry Policies
-### 13.14 Test Async Workflows
+### 6.4 Website Deployment
+- Upload production assets to S3.
+- Configure CloudFront invalidation.
+- Verify website access.
+- Test authentication and API integration.
+- Validate website behavior on desktop and mobile browsers.
 
 ---
 
-# Phase 14 — Serverless Infrastructure
+## Phase 7 — Domain & Media
 
-### 14.1 Identify Lambda Use Cases
-### 14.2 Create Lambda Functions
-### 14.3 Configure Lambda IAM Roles
-### 14.4 Configure Lambda Environment Variables
-### 14.5 Configure Lambda Networking
-### 14.6 Configure Lambda Layers Where Required
-### 14.7 Configure Lambda Timeouts
-### 14.8 Configure Lambda Memory
-### 14.9 Configure Lambda Concurrency
-### 14.10 Configure Lambda Logging
-### 14.11 Configure Lambda Monitoring
-### 14.12 Configure Lambda Triggers
-### 14.13 Lambda Testing
-### 14.14 Lambda Failure Handling
+### 7.1 Domain Configuration
+- Define the domain and subdomain strategy.
+- Configure DNS records.
+- Configure the frontend domain.
+- Configure the API domain.
+- Validate TLS certificates.
+- Verify HTTPS redirects and DNS resolution.
 
----
+### 7.2 Media Storage
+- Create a separate S3 bucket for application uploads if required.
+- Configure Block Public Access.
+- Configure encryption.
+- Define the media storage structure.
+- Configure lifecycle policies where useful.
 
-# Phase 15 — Observability & Monitoring
+### 7.3 Media Access
+- Implement authorized media upload and download flows.
+- Configure pre-signed URLs where appropriate.
+- Configure S3 CORS for browser uploads.
+- Validate access permissions.
+- Prevent unauthorized access to private media.
 
-### 15.1 Define Observability Strategy
-### 15.2 Configure CloudWatch Logs
-### 15.3 Configure CloudWatch Metrics
-### 15.4 Configure CloudWatch Dashboards
-### 15.5 Configure CloudWatch Alarms
-### 15.6 Configure Application Logs
-### 15.7 Configure Infrastructure Logs
-### 15.8 Configure ECS Metrics
-### 15.9 Configure RDS Metrics
-### 15.10 Configure Redis Metrics
-### 15.11 Configure MSK Metrics
-### 15.12 Configure ALB Metrics
-### 15.13 Configure API Metrics
-### 15.14 Configure Centralized Logging
-### 15.15 Configure Distributed Tracing
-### 15.16 Configure Alerting
-### 15.17 Observability Verification
+### 7.4 Media Delivery
+- Decide whether CloudFront is required for uploaded media.
+- Configure caching if beneficial.
+- Test profile image and community media workflows.
+- Review storage and data transfer costs.
 
 ---
 
-# Phase 16 — Reliability & Resilience
+## Phase 8 — CI/CD Pipeline
 
-### 16.1 Define High Availability Strategy
-### 16.2 Configure Multi-AZ Architecture
-### 16.3 Configure ECS Auto Scaling
-### 16.4 Configure Health Checks
-### 16.5 Configure Service Recovery
-### 16.6 Configure Database Failover
-### 16.7 Configure Redis Recovery
-### 16.8 Configure Kafka Recovery
-### 16.9 Configure SQS Retry & DLQ
-### 16.10 Configure Backup Strategy
-### 16.11 Configure Disaster Recovery
-### 16.12 Define RTO & RPO
-### 16.13 Failure Scenario Testing
-### 16.14 Recovery Testing
+### 8.1 Pipeline Design
+- Define the GitHub Actions workflow.
+- Separate build, test, and deployment stages.
+- Define deployment permissions.
+- Establish a controlled deployment process.
 
----
+### 8.2 AWS Authentication
+- Configure GitHub Actions OIDC with AWS.
+- Create a restricted deployment role.
+- Configure role trust conditions.
+- Avoid long-lived AWS access keys in GitHub secrets.
 
-# Phase 17 — CI/CD Infrastructure
+### 8.3 Backend Pipeline
+- Build Spring Boot services.
+- Run automated tests.
+- Build Docker images.
+- Publish images to ECR.
+- Deploy approved changes to ECS.
+- Verify deployment health.
 
-### 17.1 Define CI/CD Architecture
-### 17.2 Configure GitHub Actions
-### 17.3 Configure AWS Authentication
-### 17.4 Configure OIDC
-### 17.5 Configure Backend Build Pipeline
-### 17.6 Configure Mobile Build Pipeline
-### 17.7 Configure Web Build Pipeline
-### 17.8 Configure Docker Build Pipeline
-### 17.9 Configure ECR Push
-### 17.10 Configure ECS Deployment
-### 17.11 Configure Web Deployment
-### 17.12 Configure CDK Deployment
-### 17.13 Configure Automated Testing
-### 17.14 Configure Security Scanning
-### 17.15 Configure Deployment Approvals
-### 17.16 Configure Rollback
-### 17.17 Configure Deployment Notifications
+### 8.4 Frontend Pipeline
+- Install dependencies.
+- Run frontend tests and build.
+- Upload assets to S3.
+- Invalidate CloudFront when required.
+- Verify website deployment.
+
+### 8.5 Infrastructure Pipeline
+- Run CDK build and tests.
+- Run CDK synthesis.
+- Review infrastructure diffs.
+- Require approval before production infrastructure changes.
+- Deploy approved changes.
+- Document rollback procedures.
 
 ---
 
-# Phase 18 — Environment Management
+## Phase 9 — Monitoring & Cost Controls
 
-### 18.1 Define Environment Architecture
-### 18.2 Configure Local Environment
-### 18.3 Configure Development Environment
-### 18.4 Configure Staging Environment
-### 18.5 Configure Production Environment
-### 18.6 Configure Environment-Specific CDK
-### 18.7 Configure Environment-Specific Secrets
-### 18.8 Configure Environment-Specific Domains
-### 18.9 Configure Environment-Specific Databases
-### 18.10 Configure Environment-Specific Monitoring
-### 18.11 Environment Promotion Strategy
-### 18.12 Environment Validation
+### 9.1 Application Monitoring
+- Configure CloudWatch Logs.
+- Configure backend application logs.
+- Monitor application errors.
+- Monitor service health and availability.
+- Configure essential CloudWatch alarms.
 
----
+### 9.2 Infrastructure Monitoring
+- Monitor ECS service health and resource utilization.
+- Monitor RDS storage, connections, and CPU.
+- Monitor load balancer and API errors where applicable.
+- Review S3 and CloudFront usage.
+- Configure alerts for important failures.
 
-# Phase 19 — Security & Compliance
+### 9.3 Cost Management
+- Configure AWS Budgets.
+- Configure billing alerts.
+- Apply consistent resource tags.
+- Review monthly service costs.
+- Identify idle and unnecessary resources.
+- Review data transfer, logging and storage charges.
 
-### 19.1 Infrastructure Security Review
-### 19.2 IAM Security Review
-### 19.3 Network Security Review
-### 19.4 Encryption Review
-### 19.5 Secrets Review
-### 19.6 S3 Security Review
-### 19.7 Database Security Review
-### 19.8 API Security Review
-### 19.9 WAF Security Rules
-### 19.10 CloudTrail Verification
-### 19.11 Security Monitoring
-### 19.12 Vulnerability Scanning
-### 19.13 Dependency Scanning
-### 19.14 Container Security Scanning
-### 19.15 Security Incident Procedure
+### 9.4 Operational Readiness
+- Document common operational tasks.
+- Define basic incident response steps.
+- Document backup verification.
+- Document secret and dependency update procedures.
+- Review infrastructure health periodically.
 
 ---
 
-# Phase 20 — Cost Optimization
+## Phase 10 — Production Verification
 
-### 20.1 Define AWS Cost Strategy
-### 20.2 Configure Resource Tagging
-### 20.3 Configure AWS Budgets
-### 20.4 Configure Cost Alerts
-### 20.5 Analyze ECS Costs
-### 20.6 Analyze RDS Costs
-### 20.7 Analyze MSK Costs
-### 20.8 Analyze Redis Costs
-### 20.9 Analyze S3 Costs
-### 20.10 Analyze CloudFront Costs
-### 20.11 Optimize NAT Gateway Usage
-### 20.12 Optimize Storage
-### 20.13 Optimize Compute
-### 20.14 Configure Resource Scheduling
-### 20.15 Monthly Cost Review
+### 10.1 Security Verification
+- Verify HTTPS.
+- Test authentication and authorization.
+- Verify database and storage access restrictions.
+- Check secret handling.
+- Review IAM permissions.
+- Scan application dependencies and container images.
 
----
+### 10.2 Functional Verification
+- Test user registration and login.
+- Test profile management.
+- Test directory and community features.
+- Test media upload and retrieval.
+- Verify frontend-to-backend integration.
+- Validate error handling.
 
-# Phase 21 — Infrastructure Testing
+### 10.3 Performance Verification
+- Test important API endpoints.
+- Measure response times.
+- Test database queries and connection pooling.
+- Run a realistic load test.
+- Verify resource utilization under load.
+- Adjust compute and database sizing based on results.
 
-### 21.1 CDK Unit Testing
-### 21.2 CDK Snapshot Testing
-### 21.3 Infrastructure Validation
-### 21.4 Network Testing
-### 21.5 Security Group Testing
-### 21.6 IAM Policy Testing
-### 21.7 Container Testing
-### 21.8 Load Balancer Testing
-### 21.9 Database Connectivity Testing
-### 21.10 Redis Connectivity Testing
-### 21.11 Kafka Connectivity Testing
-### 21.12 S3 Access Testing
-### 21.13 API Integration Testing
-### 21.14 Failure Testing
-### 21.15 Disaster Recovery Testing
+### 10.4 Backup and Recovery
+- Verify database backup configuration.
+- Test database restoration.
+- Document recovery steps.
+- Define acceptable downtime and data-loss targets.
+- Review the need for additional disaster recovery resources.
 
----
-
-# Phase 22 — Production Readiness
-
-### 22.1 Production Infrastructure Review
-### 22.2 Production Security Review
-### 22.3 Production Networking Review
-### 22.4 Production Database Review
-### 22.5 Production Kafka Review
-### 22.6 Production Redis Review
-### 22.7 Production S3 Review
-### 22.8 Production ECS Review
-### 22.9 Production API Review
-### 22.10 Production Monitoring Review
-### 22.11 Production Backup Verification
-### 22.12 Production Disaster Recovery Verification
-### 22.13 Production Cost Review
-### 22.14 Production Performance Review
-### 22.15 Production Deployment Verification
+### 10.5 Deployment Verification
+- Verify frontend and backend deployments.
+- Test health checks.
+- Test rollback procedures.
+- Confirm monitoring and budget alerts.
+- Review final infrastructure costs.
+- Complete the production readiness checklist.
 
 ---
 
-# Phase 23 — Operations & Maintenance
+## Deferred Infrastructure — Add Only When Required
 
-### 23.1 Infrastructure Documentation
-### 23.2 Runbook Creation
-### 23.3 Incident Response Procedures
-### 23.4 Backup Monitoring
-### 23.5 Certificate Renewal Monitoring
-### 23.6 Secret Rotation Monitoring
-### 23.7 Dependency Updates
-### 23.8 Container Image Updates
-### 23.9 Infrastructure Updates
-### 23.10 AWS Service Updates
-### 23.11 Capacity Planning
-### 23.12 Cost Review
-### 23.13 Security Review
-### 23.14 Disaster Recovery Drills
-### 23.15 Technical Debt Management
-### 23.16 Infrastructure Improvement
+The following components are not part of the minimum initial deployment:
+
+- Amazon ElastiCache for Redis.
+- Amazon MSK for Kafka.
+- Amazon SQS and SNS.
+- AWS Lambda for optional background tasks.
+- AWS WAF and advanced traffic protection.
+- NAT Gateway and additional VPC endpoints.
+- Multi-AZ RDS and advanced disaster recovery.
+- Complex auto-scaling policies.
+- Distributed tracing and advanced observability.
+- Separate staging AWS environment.
+
+Introduce these components when actual traffic, reliability requirements, or application functionality justify their operational complexity and cost.
+
+## Cost and Deployment Policy
+
+- Do not deploy infrastructure before reviewing estimated monthly costs.
+- Prefer small, appropriately sized resources during initial development.
+- Use local development and CDK synthesis before provisioning AWS resources.
+- Keep database and application secrets out of Git.
+- Review actual AWS charges after deployment.
+- Scale resources based on measurements rather than the maximum registered-user estimate alone.
+
+**Target outcome:** A maintainable React and Spring Boot platform for a community of fewer than 100,000 users, using only the AWS infrastructure needed to run the application reliably.
