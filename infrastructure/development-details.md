@@ -1079,3 +1079,606 @@ The Git status was clean on branch `main`, and the build, test suite and synthes
 The infrastructure repository is ready for the next implementation phase, subject to the remaining test-alignment and deployment-security reviews.
 
 ---
+
+# Phase 2 — Minimal VPC Networking
+
+## 1. Phase Overview
+
+**Project:** We Are Navodayan  
+**Phase:** 2 — Minimal VPC Networking  
+**Status:** Implemented and validated; deployment pending  
+**Environment:** Development  
+**AWS Region:** `ap-south-1` (Asia Pacific — Mumbai)  
+**Infrastructure as Code:** AWS CDK  
+**Programming Language:** TypeScript  
+**Stack Name:** `we-are-navodayan-dev`  
+**Git Branch:** `main`
+
+### Objective
+
+Design and validate a cost-conscious AWS network foundation for the We Are Navodayan platform using AWS CDK and TypeScript.
+
+This phase establishes a VPC, public subnets, private application subnets, isolated database subnets, an Internet Gateway, route tables, and a restricted default security group.
+
+The design uses two Availability Zones while keeping NAT gateways, VPC endpoints, custom network ACLs, and other optional networking resources out of the initial implementation.
+
+**Important:** No application infrastructure resources have been deployed. All validation has been performed locally through CDK synthesis, automated tests, and a read-only CDK diff.
+
+---
+
+## 2. Architecture and Design Decisions
+
+### 2.1 Network Architecture
+
+The VPC uses the IPv4 CIDR block `10.20.0.0/16`.
+
+Six subnets are distributed across two Availability Zones.
+
+| Subnet Type | Availability Zone | CIDR Block | Purpose |
+|---|---|---|---|
+| Public | `ap-south-1a` | `10.20.0.0/24` | Public-facing network resources, if required |
+| Public | `ap-south-1b` | `10.20.1.0/24` | Public-facing network resources, if required |
+| Application | `ap-south-1a` | `10.20.2.0/24` | Private application workloads |
+| Application | `ap-south-1b` | `10.20.3.0/24` | Private application workloads |
+| Database | `ap-south-1a` | `10.20.4.0/24` | Isolated database workloads |
+| Database | `ap-south-1b` | `10.20.5.0/24` | Isolated database workloads |
+
+The subnet CIDR assignments above represent the current synthesized development configuration.
+
+### 2.2 High-Level Network Diagram
+
+```text
+                         Internet
+                            |
+                     Internet Gateway
+                            |
+                +-----------+-----------+
+                |                       |
+             Public AZ-a             Public AZ-b
+             10.20.0.0/24             10.20.1.0/24
+                |                       |
+                +-----------+-----------+
+                            |
+                    VPC: 10.20.0.0/16
+                            |
+                +-----------+-----------+
+                |                       |
+          Application AZ-a        Application AZ-b
+           10.20.2.0/24             10.20.3.0/24
+                |                       |
+                +-----------+-----------+
+                            |
+                +-----------+-----------+
+                |                       |
+            Database AZ-a           Database AZ-b
+            10.20.4.0/24             10.20.5.0/24
+```
+
+**Note:** The diagram represents subnet organization, not unrestricted connectivity between subnet groups. Actual traffic permissions will be configured through security groups and service-specific networking when application resources are introduced.
+
+The application subnets currently have no general internet egress because NAT gateways are disabled. Database subnets are isolated from internet routes.
+
+### 2.3 Cost-Conscious Networking Decisions
+
+| Component | Decision | Reason |
+|---|---|---|
+| VPC | Included | Provides network isolation |
+| Availability Zones | Two | Establishes a multi-AZ network layout |
+| Public subnets | Included | Supports public-facing network resources if required |
+| Private application subnets | Included | Separates application workloads from public subnets |
+| Isolated database subnets | Included | Avoids direct internet routing to database workloads |
+| Internet Gateway | Included | Enables internet routing for public subnets |
+| NAT Gateway | Deferred | Avoids hourly and data-processing charges |
+| VPC endpoints | Deferred | Add only when justified by service requirements and cost |
+| Custom network ACLs | Deferred | Retain default network ACL behavior initially |
+| VPC Flow Logs | Deferred | Revisit when monitoring and troubleshooting requirements justify the cost |
+| Application security groups | Deferred | Define alongside actual application services |
+| Application compute | Not included | Planned for a later phase |
+| Database instances | Not included | Planned for a later phase |
+
+The network layout spans two Availability Zones, but this does not mean all application services must run in multiple zones. Compute and database redundancy will be decided separately based on cost, availability, and workload requirements.
+
+---
+
+## 3. Repository Structure
+
+The infrastructure repository is located at:
+
+```text
+C:\Users\SanjayKumar6\Desktop\Code\we-are-navodayan\infrastructure
+```
+
+The relevant project structure is:
+
+```text
+infrastructure/
+├── bin/
+│   └── we-are-navodayan-infrastructure.ts
+├── lib/
+│   ├── config/
+│   │   └── environment-config.ts
+│   ├── constructs/
+│   │   └── project-tags.ts
+│   └── we-are-navodayan-infrastructure-stack.ts
+├── test/
+│   └── we-are-navodayan-infrastructure.test.ts
+├── cdk.json
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+├── jest.config.js
+├── .gitignore
+└── README.md
+```
+
+### Directory Responsibilities
+
+| Path | Responsibility |
+|---|---|
+| `lib/config/environment-config.ts` | Environment-specific networking configuration |
+| `lib/constructs/project-tags.ts` | Common project and environment tags |
+| `lib/we-are-navodayan-infrastructure-stack.ts` | VPC and network resource definitions |
+| `test/we-are-navodayan-infrastructure.test.ts` | Automated infrastructure tests |
+| `bin/we-are-navodayan-infrastructure.ts` | CDK application entry point |
+| `cdk.json` | CDK application command and context |
+
+The infrastructure repository is maintained independently from the web and backend repositories.
+
+---
+
+## 4. Implementation Details
+
+### 4.1 Configure Environment-Specific Networking
+
+File:
+
+```text
+lib/config/environment-config.ts
+```
+
+The environment configuration contains the following network-related properties:
+
+```typescript
+export interface EnvironmentConfig {
+  readonly environment: string;
+  readonly awsRegion: string;
+  readonly project: string;
+  readonly removalPolicy: "retain" | "destroy";
+  readonly vpcCidr: string;
+  readonly maxAvailabilityZones: number;
+  readonly natGateways: number;
+}
+```
+
+The development configuration includes:
+
+```typescript
+dev: {
+  environment: "dev",
+  awsRegion: "ap-south-1",
+  project: "we-are-navodayan",
+  removalPolicy: "destroy",
+  vpcCidr: "10.20.0.0/16",
+  maxAvailabilityZones: 2,
+  natGateways: 0,
+}
+```
+
+The `natGateways` value remains `0` to avoid creating NAT gateways during the initial network implementation.
+
+The `removalPolicy` setting is configuration only. It does not automatically apply a removal policy to resources unless explicitly implemented for those resources.
+
+### 4.2 Create the VPC
+
+File:
+
+```text
+lib/we-are-navodayan-infrastructure-stack.ts
+```
+
+The VPC is defined using the AWS CDK EC2 module.
+
+```typescript
+const vpc = new ec2.Vpc(this, "ProjectVpc", {
+  vpcName: `${config.project}-${config.environment}-vpc`,
+  ipAddresses: ec2.IpAddresses.cidr(config.vpcCidr),
+  maxAzs: config.maxAvailabilityZones,
+  natGateways: config.natGateways,
+  restrictDefaultSecurityGroup: true,
+  subnetConfiguration: [
+    {
+      name: "Public",
+      subnetType: ec2.SubnetType.PUBLIC,
+      cidrMask: 24,
+    },
+    {
+      name: "Application",
+      subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      cidrMask: 24,
+    },
+    {
+      name: "Database",
+      subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      cidrMask: 24,
+    },
+  ],
+});
+```
+
+This configuration defines:
+
+- One VPC.
+- Two Availability Zones.
+- Two public subnets.
+- Two private application subnets.
+- Two isolated database subnets.
+- No NAT gateways.
+- A restricted default security group.
+
+The `PRIVATE_WITH_EGRESS` subnet type does not automatically provide internet access when no NAT gateway or other suitable egress path is configured.
+
+### 4.3 Configure Public Subnets
+
+The public subnets use the `PUBLIC` subnet type.
+
+Their route tables contain default routes through the VPC's Internet Gateway.
+
+The public route configuration enables resources placed in public subnets to use the Internet Gateway, subject to their own networking configuration and security controls.
+
+No application load balancer, EC2 instance, or other public-facing application resource is created in this phase.
+
+### 4.4 Configure Private Application Subnets
+
+The application subnets use the `PRIVATE_WITH_EGRESS` subnet type.
+
+The current development configuration has no NAT gateways, so the application subnets do not receive a general internet default route.
+
+This keeps the initial network configuration simple and avoids NAT gateway costs.
+
+Future application deployments may require outbound connectivity for container image pulls, package downloads, AWS service APIs, or external APIs. Before deploying those workloads, the required connectivity must be reviewed and an appropriate solution selected.
+
+Possible options include:
+
+- A NAT gateway, if justified by the workload and budget.
+- Selective VPC endpoints for supported AWS services.
+- Another explicitly designed and secured connectivity arrangement.
+
+No general internet egress solution has been provisioned.
+
+### 4.5 Configure Isolated Database Subnets
+
+The database subnets use the `PRIVATE_ISOLATED` subnet type.
+
+They do not have internet default routes.
+
+These subnets are intended for database resources such as Amazon RDS PostgreSQL.
+
+When database infrastructure is introduced, access will be restricted through dedicated security groups so that the database accepts connections only from approved application resources.
+
+No database instance or database subnet group is created in this phase.
+
+### 4.6 Create and Attach the Internet Gateway
+
+The VPC includes an Internet Gateway.
+
+The gateway is attached to the VPC, and both public subnet route tables have default routes through it.
+
+The automated tests verify that:
+
+- The Internet Gateway exists.
+- The gateway attachment references the expected VPC.
+- The public routes use the expected Internet Gateway.
+- Both public subnets have the expected routing configuration.
+
+The Internet Gateway is part of the synthesized infrastructure template and has not been deployed.
+
+### 4.7 Configure Route Tables
+
+CDK generates route tables and subnet associations for the six subnets.
+
+The current design uses six route tables, one for each subnet.
+
+The automated tests verify:
+
+- Six subnet resources exist.
+- Six route tables exist.
+- Six subnet-to-route-table associations exist.
+- Every subnet is associated with a distinct route table.
+- Every association references a route table defined in the template.
+
+This validates the expected route-table association structure.
+
+### 4.8 Restrict the Default Security Group
+
+The VPC configuration uses:
+
+```typescript
+restrictDefaultSecurityGroup: true,
+```
+
+This instructs CDK to restrict the VPC's default security group.
+
+The synthesized template includes CDK's custom resource mechanism for enforcing that restriction. This mechanism introduces supporting IAM and Lambda resources into the proposed CloudFormation stack.
+
+These are additional resources to consider during security review and cost assessment.
+
+The configuration does not create application-specific security groups. Dedicated security groups will be introduced when the application load balancer, backend services, and database are designed.
+
+### 4.9 Network ACL Decision
+
+No custom network ACL resources have been explicitly defined.
+
+The initial design retains AWS default network ACL behavior rather than introducing custom rules without a specific requirement.
+
+Security groups will provide the primary service-level network access controls for the initial application architecture.
+
+Custom network ACLs can be considered later if subnet-level traffic filtering becomes necessary.
+
+### 4.10 VPC Endpoint Decision
+
+No VPC endpoints have been explicitly defined.
+
+VPC endpoints will be considered when the application requires private access to supported AWS services and the costs are understood.
+
+Interface endpoints can incur hourly and data-processing charges. Gateway endpoints have different pricing considerations.
+
+Because NAT gateways are disabled, the application subnets currently have no general internet egress. Selective VPC endpoints may support access to particular AWS services but do not provide general internet connectivity.
+
+### 4.11 NAT Gateway Decision
+
+The development configuration uses:
+
+```typescript
+natGateways: 0,
+```
+
+No NAT gateway resources are created.
+
+This is a deliberate cost-control decision, not a claim that application workloads will never require outbound connectivity.
+
+Before deploying application services, required outbound destinations and connectivity options must be reviewed.
+
+### 4.12 VPC Flow Logs Decision
+
+VPC Flow Logs have been deferred.
+
+They can help with network troubleshooting and traffic analysis, but log ingestion, retention, and storage may introduce additional charges.
+
+The requirement will be revisited when network monitoring and security investigation needs justify the cost.
+
+### 4.13 Network Connectivity Validation
+
+No live network connectivity tests have been performed because the VPC has not been deployed.
+
+The current validation is limited to:
+
+- TypeScript compilation.
+- Automated CDK infrastructure tests.
+- CDK synthesis.
+- CDK diff against the AWS environment.
+
+Live routing, DNS, application connectivity, and security-group behavior must be tested after deployment is explicitly approved.
+
+---
+
+## 5. Automated Tests
+
+File:
+
+```text
+test/we-are-navodayan-infrastructure.test.ts
+```
+
+The test suite currently contains 12 tests.
+
+| # | Test | Expected Result |
+|---|---|---|
+| 1 | Configures two Availability Zones | Pass |
+| 2 | Restricts the VPC default security group | Pass |
+| 3 | Creates one VPC with the expected CIDR | Pass |
+| 4 | Creates six subnets across two Availability Zones | Pass |
+| 5 | Creates two public, two application, and two database subnets | Pass |
+| 6 | Creates an Internet Gateway and attaches it to the VPC | Pass |
+| 7 | Routes both public subnets through the Internet Gateway | Pass |
+| 8 | Keeps application subnets private without internet routes | Pass |
+| 9 | Keeps database subnets isolated without internet routes | Pass |
+| 10 | Associates every subnet with its own route table | Pass |
+| 11 | Does not create NAT gateways | Pass |
+| 12 | Does not create application compute or database instances | Pass |
+
+### 5.1 Run the Test Suite
+
+From the infrastructure repository:
+
+```powershell
+Set-Location "C:\Users\SanjayKumar6\Desktop\Code\we-are-navodayan\infrastructure"
+
+npm run build
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Build failed."
+}
+
+npm test
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Tests failed."
+}
+```
+
+**Latest recorded result:** 12 tests passed, one test suite passed.
+
+### 5.2 Test Coverage Limitations
+
+The current tests validate the synthesized network resource structure and selected routing and security properties.
+
+They do not prove:
+
+- Live connectivity between deployed resources.
+- Actual internet connectivity.
+- Application availability.
+- Database reachability.
+- Runtime security-group behavior.
+- Production readiness.
+
+These checks require further implementation and, where applicable, deployed resources.
+
+---
+
+## 6. CDK Synthesis and Diff Validation
+
+### 6.1 Run CDK Synthesis
+
+```powershell
+Set-Location "C:\Users\SanjayKumar6\Desktop\Code\we-are-navodayan\infrastructure"
+
+npx cdk synth --profile navodayan-dev --quiet
+
+if ($LASTEXITCODE -ne 0) {
+    throw "CDK synthesis failed."
+}
+```
+
+**Result:** Passed.
+
+The synthesized CloudFormation template includes the proposed VPC, subnet, route-table, Internet Gateway, and default security-group restriction resources.
+
+### 6.2 Run CDK Diff
+
+```powershell
+npx cdk diff --profile navodayan-dev
+```
+
+**Result:** Passed.
+
+The latest diff reported the expected proposed additions, including:
+
+- VPC.
+- Six subnets.
+- Six route tables.
+- Six subnet-to-route-table associations.
+- Public default routes.
+- Internet Gateway and VPC attachment.
+- CDK's default security-group restriction custom resource.
+- Supporting Lambda function and IAM role.
+- CloudFormation outputs.
+
+The diff reported one stack with differences.
+
+**Important:** A successful CDK diff does not mean the resources have been deployed. It is a review of proposed infrastructure changes.
+
+No application infrastructure deployment was performed.
+
+---
+
+## 7. Git History and Commits
+
+The infrastructure repository has maintained the networking work on the `main` branch.
+
+Relevant recorded commits:
+
+```text
+da54410 Phase 2.12 : Restrict default security group
+fdea443 Phase 2.9 : Validate subnet route table associations
+b939c36 Phase 2.7 : Validate Internet Gateway configuration
+ad02c84 Phase 2.6 : Validate isolated database subnet routing
+49820d3 Phase 2.5 : Validate private application subnet routing
+851401a Phase 2.4 : Validate public subnet routing
+6f05369 Phase 2.3 : Validate multi-AZ network configuration
+058b61f Phase 2.2 : Finalize configurable VPC foundation
+afaae20 Phase 2.1 : Design cost-conscious VPC architecture
+58afa3c Phase 1 : Initialize AWS CDK infrastructure
+2206854 Phase 0 : Infrastructure & Cloud Foundation
+```
+
+Phases 2.8, 2.10, 2.11, and 2.13 did not require code changes or separate commits because the relevant decisions were already represented by the existing configuration or deliberately deferred.
+
+The Phase 2.12 commit includes the default security-group restriction and its regression test.
+
+### 7.1 Verify Git Status
+
+```powershell
+Set-Location "C:\Users\SanjayKumar6\Desktop\Code\we-are-navodayan\infrastructure"
+
+git log -10 --oneline
+
+git status --short --branch
+```
+
+The latest reported status after Phase 2.12 was a clean `main` branch synchronized with `origin/main`.
+
+---
+
+## 8. Phase 2 Completion Checklist
+
+### Network Foundation
+
+- [x] Define the VPC CIDR.
+- [x] Configure two Availability Zones.
+- [x] Create two public subnets.
+- [x] Create two private application subnets.
+- [x] Create two isolated database subnets.
+- [x] Configure the Internet Gateway.
+- [x] Validate public subnet default routes.
+- [x] Validate private application subnet routing.
+- [x] Validate isolated database subnet routing.
+- [x] Validate route-table associations.
+- [x] Keep NAT gateways disabled.
+- [x] Restrict the VPC default security group.
+- [x] Validate the infrastructure with automated tests.
+- [x] Run TypeScript build successfully.
+- [x] Run CDK synthesis successfully.
+- [x] Run CDK diff successfully.
+- [x] Commit and push the default security-group restriction.
+
+### Deliberately Deferred
+
+- [x] Retain default network ACL behavior.
+- [x] Defer VPC endpoints until justified.
+- [x] Defer VPC Flow Logs until monitoring needs justify the cost.
+- [x] Defer application-specific security groups until service architecture is finalized.
+- [x] Avoid deploying application compute or database resources in this phase.
+
+### Remaining Before Production Use
+
+- [ ] Review the full cost estimate before provisioning.
+- [ ] Review CDK deployment and custom-resource IAM permissions.
+- [ ] Finalize application ingress and egress requirements.
+- [ ] Define application-specific security groups.
+- [ ] Decide how private workloads will access required AWS services.
+- [ ] Deploy the network only after explicit approval.
+- [ ] Run live network connectivity and security tests after deployment.
+
+---
+
+## 9. Cost and Security Considerations
+
+The design intentionally avoids adding NAT gateways, VPC endpoints, custom network ACLs, and flow logs before their requirements are established.
+
+However, the absence of NAT gateways also means private application workloads do not have general internet egress. That limitation must be addressed before deploying workloads that require outbound access.
+
+The restricted default security group also introduces a CDK custom resource provider with supporting Lambda and IAM resources in the synthesized template. These resources and their permissions must be reviewed before deployment.
+
+The VPC design spans two Availability Zones, but database and application availability decisions remain separate. Multi-AZ network placement alone does not make application services highly available.
+
+No AWS application infrastructure resources were deployed during this phase.
+
+---
+
+## 10. Overall Status
+
+**Phase 2 — Minimal VPC Networking: Implemented and validated locally.**
+
+**Automated tests:** 12/12 passed.
+
+**TypeScript build:** Passed.
+
+**CDK synthesis:** Passed.
+
+**CDK diff:** Passed.
+
+**Git:** Phase 2.12 committed and pushed; latest reported working tree clean.
+
+**AWS deployment:** Pending cost review, deployment-permission review, and explicit approval.
+
+The networking foundation is ready for the next implementation phase: **Phase 3 — Security & Secrets**.
